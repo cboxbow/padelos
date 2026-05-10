@@ -18,7 +18,7 @@ import {
 
 // Messages d'erreur lisibles (clé = valeur du param ?error=)
 const ERROR_MESSAGES: Record<string, string> = {
-  lien_expire:         'Ce lien a expiré. Demandez-en un nouveau ci-dessous.',
+  lien_expire:         'Ce lien a expiré ou a déjà été utilisé. Demandez-en un nouveau ci-dessous.',
   acces_refuse:        'Accès refusé. Veuillez réessayer.',
   session_introuvable: 'Session introuvable. Veuillez vous reconnecter.',
   erreur_auth:         'Erreur d\'authentification. Veuillez réessayer.',

@@ -57,22 +57,30 @@ export default function AuthCallbackPage() {
       return
     }
 
-    // ── 2. Établir la session (PKCE ou hash access_token) ────────────────────
+    // ── 2. Établir la session ────────────────────────────────────────────────
+    //
+    // Pourquoi on ne bloque pas sur l'échec de exchangeCodeForSession ?
+    //
+    // Le flow PKCE stocke un "code verifier" dans localStorage au moment du
+    // signInWithOtp(). Si l'utilisateur ouvre le lien dans un AUTRE navigateur
+    // (ex. : client mail ouvre dans Chrome, OTP demandé dans Safari), le
+    // verifier est introuvable → échange échoue → erreur PKCE.
+    //
+    // Mais Supabase peut quand même avoir établi la session côté serveur.
+    // On essaie l'échange, et on tombe dans getSession() quoi qu'il arrive.
     const supabase = createClient()
     const code     = params.get('code')
 
     if (code) {
-      const { error } = await supabase.auth.exchangeCodeForSession(code)
-      if (error) {
-        router.replace('/login?error=erreur_auth')
-        return
-      }
+      // Ignore l'erreur PKCE — on récupère la session juste après
+      await supabase.auth.exchangeCodeForSession(code)
     }
 
-    // Récupérer l'utilisateur (getSession lit aussi le hash automatiquement)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.user) {
-      router.replace('/login?error=session_introuvable')
+    // getSession() détecte aussi les sessions hash (#access_token=...)
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError || !session?.user) {
+      // Dernier recours : le lien est expiré ou invalide → inviter à en demander un nouveau
+      router.replace('/login?error=lien_expire')
       return
     }
 
@@ -107,7 +115,15 @@ export default function AuthCallbackPage() {
     }
 
     const orgSlug = await getUserOrgSlug(user.id)
-    router.replace(orgSlug ? `/${orgSlug}` : '/login?error=no_org')
+
+    if (orgSlug) {
+      router.replace(`/${orgSlug}`)
+      return
+    }
+
+    // Utilisateur authentifié mais sans organisation → rediriger vers l'inscription
+    // pour qu'il crée son org (cas : magic link login sans avoir fait le register)
+    router.replace('/register?info=no_org')
   }
 
   return (
