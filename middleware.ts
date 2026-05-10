@@ -37,7 +37,8 @@ export async function middleware(request: NextRequest) {
   const isDashboardRoute =
     !pathname.startsWith('/login') &&
     !pathname.startsWith('/register') &&
-    !pathname.startsWith('/callback') &&
+    !pathname.startsWith('/callback') &&      // (auth)/callback → /callback
+    !pathname.startsWith('/auth/callback') && // app/auth/callback → /auth/callback
     !pathname.startsWith('/t/') &&
     !pathname.startsWith('/obs/') &&
     !pathname.startsWith('/api/obs') &&
