@@ -11,8 +11,8 @@
     "test": "vitest",
     "test:coverage": "vitest run --coverage",
     "db:migrate": "supabase db push",
-    "db:seed": "supabase db reset --local",
-    "db:types": "supabase gen types typescript --local > src/types/database.ts"
+    "db:seed": "echo \"Run supabase/seed/01_organizations.sql then 02_players.sql in Supabase SQL Editor\"",
+    "db:types": "supabase gen types typescript --project-id cessldmjhxathuwbovej > src/types/database.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
