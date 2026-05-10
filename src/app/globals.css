@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* MPL dark theme — mapped to shadcn/ui CSS variables */
+    --background: 220 30% 5%;        /* court-deep #080A0F */
+    --foreground: 220 9% 93%;
+
+    --card: 220 26% 7%;              /* court-card #0E1118 */
+    --card-foreground: 220 9% 93%;
+
+    --popover: 220 26% 9%;           /* court-panel #131720 */
+    --popover-foreground: 220 9% 93%;
+
+    --primary: 43 51% 54%;           /* gold #C9A84C */
+    --primary-foreground: 0 0% 0%;
+
+    --secondary: 220 28% 15%;        /* court-hover #1A2030 */
+    --secondary-foreground: 220 9% 93%;
+
+    --muted: 220 28% 12%;
+    --muted-foreground: 220 9% 55%;
+
+    --accent: 43 51% 54%;            /* gold */
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 0 62% 35%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 28% 17%;           /* border #1E2535 */
+    --input: 220 28% 17%;
+    --ring: 43 51% 54%;              /* gold ring */
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  h1, h2, h3 {
+    @apply font-display tracking-wide;
+  }
+}
+
+@layer utilities {
+  .text-gold-gradient {
+    background: linear-gradient(135deg, #E8C96A 0%, #C9A84C 50%, #8B6914 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .border-gold-glow {
+    border-color: rgba(201, 168, 76, 0.3);
+    box-shadow: 0 0 12px rgba(201, 168, 76, 0.1);
+  }
+
+  .bg-court-glass {
+    background: rgba(14, 17, 24, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
