@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Mail } from 'lucide-react'
+import { Mail, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { loginSchema, type LoginInput } from '@/lib/validations/auth'
@@ -15,9 +16,22 @@ import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/form'
 
+// Messages d'erreur lisibles (clé = valeur du param ?error=)
+const ERROR_MESSAGES: Record<string, string> = {
+  lien_expire:         'Ce lien a expiré. Demandez-en un nouveau ci-dessous.',
+  acces_refuse:        'Accès refusé. Veuillez réessayer.',
+  session_introuvable: 'Session introuvable. Veuillez vous reconnecter.',
+  erreur_auth:         'Erreur d\'authentification. Veuillez réessayer.',
+  no_org:              'Aucune organisation associée. Créez un compte.',
+  onboarding_failed:   'Erreur lors de la création de votre compte. Contactez le support.',
+}
+
 export default function LoginPage() {
   const [sent, setSent] = useState(false)
   const [sentEmail, setSentEmail] = useState('')
+  const searchParams = useSearchParams()
+  const errorKey  = searchParams.get('error')
+  const errorMsg  = errorKey ? (ERROR_MESSAGES[errorKey] ?? 'Une erreur est survenue.') : null
 
   const form = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
@@ -58,6 +72,14 @@ export default function LoginPage() {
           Mauritius Padel League
         </p>
       </div>
+
+      {/* Bandeau d'erreur auth (provient de /auth/callback) */}
+      {errorMsg && (
+        <div className="flex items-start gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 mb-4">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>{errorMsg}</span>
+        </div>
+      )}
 
       <div className="rounded-xl border border-border bg-court-card p-8 space-y-6">
         {sent ? (
