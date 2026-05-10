@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { Bebas_Neue, Rajdhani, JetBrains_Mono } from 'next/font/google'
+import { Providers } from '@/components/Providers'
 import './globals.css'
 
 const bebasNeue = Bebas_Neue({
@@ -43,7 +44,7 @@ export default function RootLayout({
       className={`dark ${bebasNeue.variable} ${rajdhani.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen bg-court text-foreground font-body antialiased">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )
