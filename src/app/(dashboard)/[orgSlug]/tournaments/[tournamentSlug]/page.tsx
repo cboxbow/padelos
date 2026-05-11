@@ -1,4 +1,6 @@
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
+import { ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { StatusBadge, CategoryBadge, SectionTitle } from '@/components/mpl'
 import { TournamentTabNav } from './_components/TournamentTabNav'
@@ -155,6 +157,16 @@ function TournamentHeader({
         <div className="flex flex-wrap items-center gap-2 pt-1">
           <StatusBadge status={tournament.status} />
           <CategoryBadge category={tournament.category} withGenderIcon />
+          {/* Public portal link */}
+          <Link
+            href={`/t/${orgSlug}/${tournament.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-body rounded border border-border text-muted-foreground hover:border-gold/40 hover:text-gold transition-colors"
+          >
+            <ExternalLink className="h-3 w-3" />
+            Voir page publique
+          </Link>
         </div>
       </div>
       <div className="flex flex-wrap gap-4 text-xs font-body text-muted-foreground">
