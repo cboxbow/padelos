@@ -19,5 +19,5 @@ ALTER TABLE tournament_entries
     CHECK (player2_id IS NOT NULL OR player2_name IS NOT NULL);
 
 -- Index pour lookup par joueur (quand on relie à un profil)
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_te_player1_id ON tournament_entries(player1_id) WHERE player1_id IS NOT NULL;
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_te_player2_id ON tournament_entries(player2_id) WHERE player2_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_te_player1_id ON tournament_entries(player1_id) WHERE player1_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_te_player2_id ON tournament_entries(player2_id) WHERE player2_id IS NOT NULL;
