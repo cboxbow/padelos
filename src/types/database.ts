@@ -281,8 +281,10 @@ export interface Database {
         Row: {
           id: string
           tournament_id: string
-          player1_id: string
-          player2_id: string
+          player1_id: string | null
+          player2_id: string | null
+          player1_name: string | null
+          player2_name: string | null
           status: EntryStatus
           seed: number | null
           registered_at: string
@@ -293,8 +295,10 @@ export interface Database {
         Insert: {
           id?: string
           tournament_id: string
-          player1_id: string
-          player2_id: string
+          player1_id?: string | null
+          player2_id?: string | null
+          player1_name?: string | null
+          player2_name?: string | null
           status?: EntryStatus
           seed?: number | null
           registered_at?: string
@@ -304,8 +308,10 @@ export interface Database {
         }
         Update: {
           tournament_id?: string
-          player1_id?: string
-          player2_id?: string
+          player1_id?: string | null
+          player2_id?: string | null
+          player1_name?: string | null
+          player2_name?: string | null
           status?: EntryStatus
           seed?: number | null
           confirmed_at?: string | null
