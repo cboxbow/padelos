@@ -17,7 +17,8 @@ import {
 import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger,
 } from '@/components/ui/sheet'
-import { addPlayer, addPlayerSchema, type AddPlayerInput } from '@/app/actions/players'
+import { addPlayer }                                        from '@/app/actions/players'
+import { addPlayerSchema, type AddPlayerInput }             from '@/lib/validations/players'
 import type { TableRow } from '@/types'
 
 type PlayerRow = Pick<

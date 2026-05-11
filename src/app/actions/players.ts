@@ -2,8 +2,9 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { z } from 'zod'
 import type { TableRow } from '@/types'
+import { addPlayerSchema } from '@/lib/validations/players'
+import type { AddPlayerInput } from '@/lib/validations/players'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -15,17 +16,6 @@ type PlayerRow = Pick<
 type ActionResult<T = void> =
   | { data: T; error?: never }
   | { error: string; data?: never }
-
-// ─── Schéma ───────────────────────────────────────────────────────────────────
-
-export const addPlayerSchema = z.object({
-  first_name:   z.string().min(2, 'Minimum 2 caractères').max(50),
-  last_name:    z.string().min(2, 'Minimum 2 caractères').max(50),
-  display_name: z.string().max(80).optional(),
-  gender:       z.enum(['M', 'F']),
-  nationality:  z.string().length(2).default('MU'),
-})
-export type AddPlayerInput = z.infer<typeof addPlayerSchema>
 
 // ─── getOrgId ─────────────────────────────────────────────────────────────────
 
