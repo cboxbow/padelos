@@ -43,7 +43,10 @@ export default function LoginPage() {
     const origin = window.location.origin
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${origin}/auth/callback` },
+      // Route vers le handler serveur /callback pour que l'échange PKCE
+      // se fasse côté serveur (lecture des cookies synchrone, pas de
+      // dépendance au timing de hydratation React).
+      options: { emailRedirectTo: `${origin}/callback` },
     })
     if (error) { toast.error(error.message); return }
     setSentEmail(email)
@@ -55,7 +58,8 @@ export default function LoginPage() {
     const origin = window.location.origin
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${origin}/auth/callback` },
+      // Même route serveur pour OAuth — le flow PKCE est identique
+      options: { redirectTo: `${origin}/callback` },
     })
     if (error) toast.error(error.message)
   }

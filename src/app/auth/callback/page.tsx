@@ -59,27 +59,35 @@ export default function AuthCallbackPage() {
 
     // ── 2. Établir la session ────────────────────────────────────────────────
     //
-    // Pourquoi on ne bloque pas sur l'échec de exchangeCodeForSession ?
+    // Cette page client est désormais uniquement appelée dans deux cas :
     //
-    // Le flow PKCE stocke un "code verifier" dans localStorage au moment du
-    // signInWithOtp(). Si l'utilisateur ouvre le lien dans un AUTRE navigateur
-    // (ex. : client mail ouvre dans Chrome, OTP demandé dans Safari), le
-    // verifier est introuvable → échange échoue → erreur PKCE.
+    // A) flow=register : le serveur /callback a déjà échangé le code et
+    //    établi la session. getSession() la trouve directement dans les cookies.
+    //    Pas besoin de réexchanger.
     //
-    // Mais Supabase peut quand même avoir établi la session côté serveur.
-    // On essaie l'échange, et on tombe dans getSession() quoi qu'il arrive.
+    // B) Hash flow (#access_token) : liens anciens / OAuth implicite.
+    //    getSession() détecte et traite le hash automatiquement.
+    //
+    // Note : le login magic link passe désormais par /callback (server route)
+    // et ne devrait plus arriver ici avec ?code=. Mais on garde le fallback
+    // pour compatibilité.
     const supabase = createClient()
     const code     = params.get('code')
 
     if (code) {
-      // Ignore l'erreur PKCE — on récupère la session juste après
-      await supabase.auth.exchangeCodeForSession(code)
+      // Fallback : si un code arrive quand même, tenter l'échange
+      // (ne devrait arriver qu'en développement ou test direct d'URL)
+      const { error: exchErr } = await supabase.auth.exchangeCodeForSession(code)
+      if (exchErr) {
+        console.error('[auth/callback] exchangeCodeForSession failed:', exchErr.message)
+        // Ne pas router.replace ici — getSession() peut avoir la session via cookies
+      }
     }
 
-    // getSession() détecte aussi les sessions hash (#access_token=...)
+    // getSession() lit les cookies de session (établis par /callback ou par l'échange ci-dessus)
+    // et traite également les hash tokens (#access_token=...) si présents.
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     if (sessionError || !session?.user) {
-      // Dernier recours : le lien est expiré ou invalide → inviter à en demander un nouveau
       router.replace('/login?error=lien_expire')
       return
     }
