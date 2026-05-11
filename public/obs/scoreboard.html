@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=800" />
+  <title>PadelOS — Scoreboard OBS</title>
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Fonts ── */
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;600;700&display=swap');
+
+    /* ── Variables MPL ── */
+    :root {
+      --gold:         #C9A84C;
+      --gold-light:   #E8C96A;
+      --court:        #0A0C12;
+      --court-card:   #0E1118;
+      --court-panel:  #131720;
+      --border:       #1E2535;
+      --fg:           #F0F2F7;
+      --muted:        #6B7694;
+    }
+
+    html, body {
+      width: 800px;
+      height: 200px;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    /* ── Wrapper ── */
+    .scoreboard {
+      width: 800px;
+      height: 200px;
+      background: var(--court-panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      font-family: 'Rajdhani', sans-serif;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.7);
+    }
+
+    /* ── Top bar: tournament name ── */
+    .top-bar {
+      height: 28px;
+      background: linear-gradient(90deg, var(--gold) 0%, var(--gold-light) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+    }
+    .top-bar .tournament-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 14px;
+      letter-spacing: 2px;
+      color: #000;
+    }
+    .top-bar .live-badge {
+      background: #cc0000;
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    /* ── Main area ── */
+    .main {
+      flex: 1;
+      display: flex;
+      align-items: stretch;
+    }
+
+    /* ── Team column ── */
+    .team {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 10px 18px;
+      gap: 4px;
+    }
+    .team.left  { border-right: 1px solid var(--border); }
+    .team .players {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--fg);
+      line-height: 1.3;
+    }
+    .team .players span { display: block; }
+    .team .players .p2  { color: var(--muted); font-size: 13px; }
+
+    /* ── Score centre ── */
+    .score-center {
+      width: 200px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: var(--court-card);
+      border-left:  1px solid var(--border);
+      border-right: 1px solid var(--border);
+      gap: 4px;
+      padding: 8px 0;
+    }
+
+    .sets-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .set-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+    .set-box .set-label {
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+    .set-box .set-score {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      line-height: 1;
+      color: var(--fg);
+    }
+    .set-box.current .set-score {
+      color: var(--gold);
+    }
+    .set-sep {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 24px;
+      color: var(--border);
+      margin-top: 12px;
+    }
+
+    .current-game {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 40px;
+      line-height: 1;
+      color: var(--gold-light);
+      letter-spacing: 2px;
+    }
+    .phase-label {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ── Serving dot ── */
+    .serving-dot {
+      width: 8px; height: 8px;
+      background: var(--gold);
+      border-radius: 50%;
+      display: inline-block;
+      margin-left: 6px;
+      vertical-align: middle;
+      opacity: 0;
+    }
+    .serving-dot.visible { opacity: 1; }
+
+    /* ── Match completed overlay ── */
+    .winner-banner {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(10,12,18,0.92);
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .winner-banner.show { display: flex; }
+    .winner-banner .label {
+      font-size: 11px;
+      color: var(--gold);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    .winner-banner .name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 36px;
+      color: var(--fg);
+      letter-spacing: 3px;
+    }
+    .winner-banner .score-str {
+      font-size: 14px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+<div class="scoreboard" id="board" style="position:relative">
+  <!-- Top bar -->
+  <div class="top-bar">
+    <span class="tournament-name" id="tournName">PadelOS Live</span>
+    <span class="live-badge" id="liveBadge">LIVE</span>
+  </div>
+
+  <!-- Main row -->
+  <div class="main">
+    <!-- Team 1 (left) -->
+    <div class="team left" id="team1">
+      <div class="players">
+        <span id="p1name">Player 1</span>
+        <span class="p2" id="p2name">Player 2</span>
+      </div>
+    </div>
+
+    <!-- Score centre -->
+    <div class="score-center">
+      <div class="phase-label" id="phaseLabel">SET 1</div>
+      <div class="sets-row" id="setsRow">
+        <!-- sets injected by JS -->
+      </div>
+      <div class="current-game" id="currentGame">0 · 0</div>
+    </div>
+
+    <!-- Team 2 (right) -->
+    <div class="team right" id="team2">
+      <div class="players">
+        <span id="p3name">Player 3</span>
+        <span class="p2" id="p4name">Player 4</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Winner overlay -->
+  <div class="winner-banner" id="winnerBanner">
+    <div class="label">Vainqueur</div>
+    <div class="name" id="winnerName">—</div>
+    <div class="score-str" id="winnerScore"></div>
+  </div>
+</div>
+
+<script>
+  // ── Parse match ID from query string ──────────────────────────────────────
+  const params  = new URLSearchParams(location.search)
+  const matchId = params.get('match')
+
+  if (!matchId) {
+    document.getElementById('tournName').textContent = 'Aucun match'
+    document.getElementById('liveBadge').style.display = 'none'
+  } else {
+    const apiBase = params.get('api') || ''   // optional override
+    connectSSE(`${apiBase}/api/obs/${matchId}/score`)
+  }
+
+  // ── SSE connection ─────────────────────────────────────────────────────────
+  function connectSSE(url) {
+    const es = new EventSource(url)
+
+    es.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        if (data) render(data)
+      } catch {}
+    }
+
+    es.onerror = () => {
+      document.getElementById('liveBadge').textContent = 'OFF'
+      document.getElementById('liveBadge').style.background = '#555'
+      // EventSource auto-reconnects
+    }
+
+    es.onopen = () => {
+      document.getElementById('liveBadge').textContent = 'LIVE'
+      document.getElementById('liveBadge').style.background = '#cc0000'
+    }
+  }
+
+  // ── Render from live_scores row ───────────────────────────────────────────
+  function render(d) {
+    // Player names
+    document.getElementById('p1name').textContent = d.player1_name || '—'
+    document.getElementById('p2name').textContent = d.player2_name || ''
+    document.getElementById('p3name').textContent = d.player3_name || '—'
+    document.getElementById('p4name').textContent = d.player4_name || ''
+
+    // Set history
+    const history = Array.isArray(d.sets_history) ? d.sets_history : []
+    const setsRow = document.getElementById('setsRow')
+    setsRow.innerHTML = ''
+
+    history.forEach((s, i) => {
+      const box = document.createElement('div')
+      box.className = 'set-box'
+      box.innerHTML = `
+        <span class="set-label">S${i+1}</span>
+        <span class="set-score">${s.e1}-${s.e2}</span>`
+      setsRow.appendChild(box)
+      if (i < history.length - 1) {
+        const sep = document.createElement('span')
+        sep.className = 'set-sep'
+        sep.textContent = '·'
+        setsRow.appendChild(sep)
+      }
+    })
+
+    // Current set / super tiebreak
+    const setNum   = d.set_number || 1
+    const isTb     = d.is_tiebreak
+    const score1   = d.score_entry1 ?? 0
+    const score2   = d.score_entry2 ?? 0
+
+    document.getElementById('phaseLabel').textContent =
+      isTb ? 'SUPER TB' : `SET ${setNum}`
+    document.getElementById('currentGame').textContent =
+      `${score1} · ${score2}`
+
+    // Current set box (live)
+    if (history.length > 0 || isTb) {
+      const curBox = document.createElement('div')
+      curBox.className = 'set-box current'
+      curBox.innerHTML = `
+        <span class="set-label">${isTb ? 'TB' : `S${setNum}`}</span>
+        <span class="set-score">${score1}-${score2}</span>`
+      if (setsRow.children.length > 0) {
+        const sep = document.createElement('span')
+        sep.className = 'set-sep'
+        sep.textContent = '·'
+        setsRow.appendChild(sep)
+      }
+      setsRow.appendChild(curBox)
+    }
+  }
+</script>
+</body>
+</html>

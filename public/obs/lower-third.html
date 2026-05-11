@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1920" />
+  <title>PadelOS — Lower Third OBS</title>
+  <style>
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ── Fonts ── */
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Rajdhani:wght@400;600;700&display=swap');
+
+    /* ── Variables MPL ── */
+    :root {
+      --gold:         #C9A84C;
+      --gold-light:   #E8C96A;
+      --court:        #0A0C12;
+      --court-card:   #0E1118;
+      --court-panel:  #131720;
+      --border:       #1E2535;
+      --fg:           #F0F2F7;
+      --muted:        #9BA3BF;
+    }
+
+    html, body {
+      width: 1920px;
+      height: 200px;
+      overflow: hidden;
+      background: transparent;
+    }
+
+    /* ── Lower third wrapper ── */
+    .lower-third {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 160px;
+      display: flex;
+      align-items: stretch;
+      font-family: 'Rajdhani', sans-serif;
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .lower-third.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── Gold accent bar ── */
+    .accent-bar {
+      width: 6px;
+      background: linear-gradient(180deg, var(--gold) 0%, var(--gold-light) 100%);
+      flex-shrink: 0;
+    }
+
+    /* ── Team panel ── */
+    .team-panel {
+      display: flex;
+      align-items: center;
+      background: linear-gradient(90deg, rgba(10,12,18,0.95) 0%, rgba(19,23,32,0.80) 100%);
+      padding: 0 40px;
+      gap: 24px;
+      flex: 1;
+    }
+
+    .team-section {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+    .team-section .label {
+      font-size: 12px;
+      color: var(--gold);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .team-section .player-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 48px;
+      line-height: 1;
+      color: var(--fg);
+      letter-spacing: 2px;
+    }
+    .team-section .player-name.p2 {
+      font-size: 36px;
+      color: var(--muted);
+    }
+
+    /* ── VS divider ── */
+    .vs-divider {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 40px;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+    .vs-divider .vs-text {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 28px;
+      color: var(--border);
+      letter-spacing: 4px;
+    }
+    .vs-divider .score-line {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      color: var(--gold);
+      letter-spacing: 3px;
+    }
+
+    /* ── Right panel: tournament + category ── */
+    .right-panel {
+      width: 320px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-end;
+      background: rgba(10,12,18,0.90);
+      padding: 0 36px;
+      gap: 4px;
+      border-left: 1px solid var(--border);
+    }
+    .right-panel .tourn-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 22px;
+      letter-spacing: 2px;
+      color: var(--fg);
+      text-align: right;
+    }
+    .right-panel .cat-badge {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #000;
+      background: var(--gold);
+      padding: 3px 10px;
+      border-radius: 4px;
+    }
+    .right-panel .phase-text {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    /* ── Bottom gold rule ── */
+    .bottom-rule {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent 0%, var(--gold) 20%, var(--gold-light) 50%, var(--gold) 80%, transparent 100%);
+    }
+  </style>
+</head>
+<body>
+
+<div class="lower-third" id="lowerThird">
+  <div class="accent-bar"></div>
+
+  <div class="team-panel">
+    <!-- Team 1 -->
+    <div class="team-section">
+      <div class="label">Équipe 1</div>
+      <div class="player-name" id="p1name">Joueur 1</div>
+      <div class="player-name p2" id="p2name">Joueur 2</div>
+    </div>
+
+    <!-- VS + live score -->
+    <div class="vs-divider">
+      <span class="vs-text">VS</span>
+      <span class="score-line" id="scoreLine">—</span>
+    </div>
+
+    <!-- Team 2 -->
+    <div class="team-section">
+      <div class="label">Équipe 2</div>
+      <div class="player-name" id="p3name">Joueur 3</div>
+      <div class="player-name p2" id="p4name">Joueur 4</div>
+    </div>
+  </div>
+
+  <!-- Right panel -->
+  <div class="right-panel">
+    <div class="tourn-name" id="tournName">PadelOS</div>
+    <div class="cat-badge" id="catBadge">M100</div>
+    <div class="phase-text" id="phaseText">EN COURS</div>
+  </div>
+
+  <div class="bottom-rule"></div>
+</div>
+
+<script>
+  const params   = new URLSearchParams(location.search)
+  const matchId  = params.get('match')
+  const apiBase  = params.get('api') || ''
+
+  if (matchId) {
+    // Slide in after brief delay (gives OBS time to render)
+    setTimeout(() => {
+      document.getElementById('lowerThird').classList.add('visible')
+    }, 600)
+
+    connectSSE(`${apiBase}/api/obs/${matchId}/score`)
+  }
+
+  function connectSSE(url) {
+    const es = new EventSource(url)
+    es.onmessage = (e) => {
+      try {
+        const d = JSON.parse(e.data)
+        if (d) render(d)
+      } catch {}
+    }
+  }
+
+  function render(d) {
+    // Player names
+    document.getElementById('p1name').textContent = d.player1_name || '—'
+    document.getElementById('p2name').textContent = d.player2_name || ''
+    document.getElementById('p3name').textContent = d.player3_name || '—'
+    document.getElementById('p4name').textContent = d.player4_name || ''
+
+    // Score summary: "6-3 · 4-6 · 7*"
+    const history = Array.isArray(d.sets_history) ? d.sets_history : []
+    const parts = history.map(s => `${s.e1}-${s.e2}`)
+    if (d.is_tiebreak) {
+      parts.push(`${d.score_entry1}*-${d.score_entry2}*`)
+    } else if (history.length < (d.set_number || 1)) {
+      parts.push(`${d.score_entry1}-${d.score_entry2}`)
+    }
+    document.getElementById('scoreLine').textContent =
+      parts.length > 0 ? parts.join(' · ') : '0-0'
+
+    // Phase
+    const setNum = d.set_number || 1
+    document.getElementById('phaseText').textContent =
+      d.is_tiebreak ? 'SUPER TIEBREAK' : `SET ${setNum} EN COURS`
+  }
+</script>
+</body>
+</html>
