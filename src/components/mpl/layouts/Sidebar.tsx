@@ -17,6 +17,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { GoldDivider } from '@/components/mpl/GoldDivider'
+import { useSignOut } from '@/hooks/use-auth'
 
 interface NavItem {
   label: string
@@ -53,6 +54,7 @@ function SidebarContent({
   onClose?: () => void
 }) {
   const navItems = buildNavItems(orgSlug)
+  const signOut = useSignOut()
 
   return (
     <div className="flex h-full flex-col">
@@ -122,7 +124,9 @@ function SidebarContent({
           </p>
         </div>
         <button
-          className="rounded p-1 text-muted-foreground hover:text-destructive transition-colors"
+          onClick={() => signOut.mutate()}
+          disabled={signOut.isPending}
+          className="rounded p-1 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
           aria-label="Se déconnecter"
         >
           <LogOut className="h-4 w-4" />
