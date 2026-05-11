@@ -4,6 +4,7 @@ import { StatusBadge, CategoryBadge, SectionTitle } from '@/components/mpl'
 import { TournamentTabNav } from './_components/TournamentTabNav'
 import { TeamsTab }         from './_components/TeamsTab'
 import { GroupsTab }        from './_components/GroupsTab'
+import { DrawTab }          from './_components/DrawTab'
 import type { TableRow } from '@/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -74,18 +75,17 @@ export default async function TournamentPage({
     groupEntries = (geResult.data ?? []) as GEntryRow[]
   }
 
-  // Fetch matches for groups
-  type MatchRow = Pick<TableRow<'matches'>, 'id' | 'group_id' | 'entry1_id' | 'entry2_id' | 'status' | 'notes'>
-  let groupMatches: MatchRow[] = []
-  if (groups.length > 0) {
-    const { data } = await supabase
-      .from('matches')
-      .select('id, group_id, entry1_id, entry2_id, status, notes')
-      .eq('tournament_id', tournament.id)
-      .eq('phase', 'qualification')
-      .order('notes', { ascending: true })
-    groupMatches = (data ?? []) as MatchRow[]
-  }
+  // Fetch ALL matches (qual + main draw)
+  type MatchRow = Pick<TableRow<'matches'>, 'id' | 'group_id' | 'entry1_id' | 'entry2_id' | 'status' | 'notes' | 'phase' | 'match_number'>
+  const { data: allMatchData } = await supabase
+    .from('matches')
+    .select('id, group_id, entry1_id, entry2_id, status, notes, phase, match_number')
+    .eq('tournament_id', tournament.id)
+    .order('notes', { ascending: true })
+
+  const allMatches  = (allMatchData ?? []) as MatchRow[]
+  const groupMatches = allMatches.filter(m => m.phase === 'qualification')
+  const drawMatches  = allMatches.filter(m => m.phase !== 'qualification')
 
   return (
     <div className="space-y-6">
@@ -123,9 +123,13 @@ export default async function TournamentPage({
         />
       )}
       {activeTab === 'draw' && (
-        <div className="rounded-xl border border-dashed border-border bg-court-card p-12 text-center">
-          <p className="font-body text-muted-foreground">Tableau principal — Session S5</p>
-        </div>
+        <DrawTab
+          tournamentSlug={tournamentSlug}
+          tournament={tournament}
+          initialMatches={drawMatches}
+          entries={entries}
+          groupsCount={groups.length}
+        />
       )}
     </div>
   )
