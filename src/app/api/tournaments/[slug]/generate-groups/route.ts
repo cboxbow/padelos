@@ -11,7 +11,7 @@ import {
 import type { TableRow } from '@/types'
 
 type TournRow = Pick<TableRow<'tournaments'>, 'id' | 'format' | 'org_id' | 'status' | 'max_pairs'>
-type EntryRow = Pick<TableRow<'tournament_entries'>, 'id' | 'seed' | 'status'>
+type EntryRow = Pick<TableRow<'tournament_entries'>, 'id' | 'seed' | 'status' | 'is_direct_entry'>
 
 export async function POST(
   _req: NextRequest,
@@ -53,7 +53,7 @@ export async function POST(
   // ── Récupérer les inscriptions ──────────────────────────────────────────────
   const { data: entriesData } = await supabase
     .from('tournament_entries')
-    .select('id, seed, status')
+    .select('id, seed, status, is_direct_entry')
     .eq('tournament_id', tournament.id)
     .not('status', 'eq', 'withdrawn')
     .order('seed', { ascending: true, nullsFirst: false })
@@ -64,11 +64,11 @@ export async function POST(
     return NextResponse.json({ error: 'Minimum 4 paires requises pour générer les groupes.' }, { status: 400 })
   }
 
-  // ── Séparer seeded / unseeded ───────────────────────────────────────────────
-  const seeded   = entries.filter(e => e.seed !== null).sort((a, b) => (a.seed ?? 99) - (b.seed ?? 99))
-  const unseeded = entries.filter(e => e.seed === null)
+  // ── Séparer Direct Entries (draw direct) vs Qualification ──────────────────
+  const qualEntries = entries.filter(e => !e.is_direct_entry)
+  const seeded   = qualEntries.filter(e => e.seed !== null).sort((a, b) => (a.seed ?? 99) - (b.seed ?? 99))
+  const unseeded = qualEntries.filter(e => e.seed === null)
 
-  // Séparer les "direct entries" (ne jouent pas les qualifs) — optionnel pour l'instant
   const toDistribute = [...seeded, ...unseeded]
 
   const nbGroups = calcGroupCount(toDistribute.length)

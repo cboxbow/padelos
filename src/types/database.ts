@@ -287,6 +287,7 @@ export interface Database {
           player2_name: string | null
           status: EntryStatus
           seed: number | null
+          is_direct_entry: boolean
           registered_at: string
           confirmed_at: string | null
           created_at: string
@@ -301,6 +302,7 @@ export interface Database {
           player2_name?: string | null
           status?: EntryStatus
           seed?: number | null
+          is_direct_entry?: boolean
           registered_at?: string
           confirmed_at?: string | null
           created_at?: string
@@ -314,6 +316,7 @@ export interface Database {
           player2_name?: string | null
           status?: EntryStatus
           seed?: number | null
+          is_direct_entry?: boolean
           confirmed_at?: string | null
           updated_at?: string
         }
