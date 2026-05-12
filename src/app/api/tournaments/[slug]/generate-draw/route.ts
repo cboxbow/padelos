@@ -1,5 +1,17 @@
+/**
+ * POST /api/tournaments/[slug]/generate-draw
+ *
+ * Génère le tableau principal avec :
+ *   • Têtes de série (is_direct_entry = true) placées aux positions FIP
+ *   • Qualifiés des groupes (top-N par groupe, N = qualifiersPerGroup)
+ *   • BYE pour compléter le tableau (puissance de 2)
+ *
+ * Body : { qualifiersPerGroup?: 1 | 2 | 3 | 4 }  (défaut : 1)
+ */
+
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { TableRow, MatchPhase } from '@/types'
@@ -9,21 +21,27 @@ type EntryRow  = Pick<TableRow<'tournament_entries'>, 'id' | 'seed' | 'player1_n
 type GroupRow  = Pick<TableRow<'qual_groups'>, 'id' | 'group_index' | 'name'>
 type GEntryRow = Pick<TableRow<'qual_group_entries'>, 'entry_id' | 'group_id' | 'position'>
 
-// ─── Seed positions (FIP-compliant) ──────────────────────────────────────────
+const bodySchema = z.object({
+  qualifiersPerGroup: z.number().int().min(1).max(4).default(1),
+})
+
+// ─── Seed positions FIP ────────────────────────────────────────────────────────
 
 const SEED_POSITIONS: Record<number, number[]> = {
+  4:  [0, 3, 1, 2],
   8:  [0, 7, 4, 3, 2, 5, 6, 1],
   16: [0, 15, 8, 7, 4, 11, 12, 3, 2, 13, 10, 5, 6, 9, 14, 1],
   32: [0, 31, 8, 23, 4, 27, 12, 19, 16, 15, 20, 11, 24, 7, 28, 3,
        2, 29, 6, 25, 10, 21, 14, 17, 1, 30, 9, 22, 5, 26, 13, 18],
+  64: Array.from({ length: 64 }, (_, i) => i), // simplified
 }
 
-function drawSizeForPairs(maxPairs: number): number {
-  const sizes = [4, 8, 16, 32, 64]
-  return sizes.find(s => s >= maxPairs) ?? 32
+function nextPow2(n: number): number {
+  return Math.pow(2, Math.ceil(Math.log2(Math.max(n, 4))))
 }
 
 function firstRoundPhase(drawSize: number): MatchPhase {
+  if (drawSize <= 4)  return 'quarter_final'
   if (drawSize <= 8)  return 'quarter_final'
   if (drawSize <= 16) return 'round_of_16'
   return 'round_of_32'
@@ -38,15 +56,33 @@ function shuffle<T>(arr: T[]): T[] {
   return a
 }
 
+// ─── Slot ─────────────────────────────────────────────────────────────────────
+
+type Slot = {
+  entryId: string | null
+  label:   string
+  seed?:   number
+  isBye:   boolean
+}
+
+function entrySlot(e: EntryRow): Slot {
+  return {
+    entryId: e.id,
+    label:   `${e.player1_name ?? '?'} / ${e.player2_name ?? '?'}`,
+    seed:    e.seed ?? undefined,
+    isBye:   false,
+  }
+}
+
 // ─── POST ─────────────────────────────────────────────────────────────────────
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params
-  const supabase = await createClient()
-  const admin    = createAdminClient()
+  const supabase  = await createClient()
+  const admin     = createAdminClient()
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
@@ -67,7 +103,11 @@ export async function POST(
     return NextResponse.json({ error: 'Générez d\'abord les groupes de qualification.' }, { status: 400 })
   }
 
-  // ── Récupérer les inscriptions ─────────────────────────────────────────────
+  // ── Body ──────────────────────────────────────────────────────────────────────
+  const rawBody = await req.json().catch(() => ({})) as Record<string, unknown>
+  const { qualifiersPerGroup } = bodySchema.parse(rawBody)
+
+  // ── Inscriptions ──────────────────────────────────────────────────────────────
   const { data: eData } = await supabase
     .from('tournament_entries')
     .select('id, seed, player1_name, player2_name, is_direct_entry')
@@ -75,130 +115,113 @@ export async function POST(
     .not('status', 'eq', 'withdrawn')
   const allEntries = (eData ?? []) as EntryRow[]
 
-  if (allEntries.length === 0) {
-    return NextResponse.json({ error: 'Aucune inscription trouvée.' }, { status: 400 })
-  }
-
-  // ── Catégoriser les entrées ────────────────────────────────────────────────
-  // Direct entries (is_direct_entry = true) : placées aux positions FIP par seed
+  // Têtes de série directes : is_direct_entry = true, triées par seed
   const directSeeded = allEntries
-    .filter(e => e.is_direct_entry && e.seed !== null)
+    .filter(e => e.is_direct_entry && e.seed != null)
     .sort((a, b) => (a.seed ?? 99) - (b.seed ?? 99))
-  const directUnseeded = shuffle(allEntries.filter(e => e.is_direct_entry && e.seed === null))
-  const directAll = [...directSeeded, ...directUnseeded]
 
-  // Entries de qualification (passent par les groupes)
-  const qualEntryIds = new Set(directAll.map(e => e.id))
-  const qualEntries  = allEntries.filter(e => !qualEntryIds.has(e.id))
+  // Directs non-seedés (wild cards)
+  const directUnseeded = shuffle(allEntries.filter(e => e.is_direct_entry && e.seed == null))
 
-  // ── Récupérer l'ordre dans les groupes ────────────────────────────────────
-  // (position = ordre après matchs; avant matchs = ordre d'insertion)
+  // ── Groupes et qualifiés ──────────────────────────────────────────────────────
   const { data: gData } = await supabase
     .from('qual_groups').select('id, group_index, name')
     .eq('tournament_id', t.id).order('group_index')
   const groups = (gData ?? []) as GroupRow[]
 
-  let orderedQuals: EntryRow[] = []
+  let qualifiedEntries: EntryRow[] = []
+
   if (groups.length > 0) {
     const { data: geData } = await supabase
       .from('qual_group_entries').select('entry_id, group_id, position')
       .in('group_id', groups.map(g => g.id))
     const groupEntries = (geData ?? []) as GEntryRow[]
 
-    // Trier par groupe (group_index) puis par position dans le groupe
     const entryMap = Object.fromEntries(allEntries.map(e => [e.id, e]))
-    const sorted: EntryRow[] = []
-    groups.forEach(g => {
+    const directIds = new Set([...directSeeded, ...directUnseeded].map(e => e.id))
+
+    for (const g of groups) {
       const members = groupEntries
-        .filter(ge => ge.group_id === g.id)
+        .filter(ge => ge.group_id === g.id && !directIds.has(ge.entry_id))
         .sort((a, b) => (a.position ?? 99) - (b.position ?? 99))
-      members.forEach(ge => {
+
+      for (let rank = 0; rank < qualifiersPerGroup && rank < members.length; rank++) {
+        const ge = members[rank]
+        if (!ge) continue
         const entry = entryMap[ge.entry_id]
-        if (entry && !qualEntryIds.has(ge.entry_id)) sorted.push(entry)
-      })
-    })
-    orderedQuals = sorted
-  } else {
-    // Pas de groupes : trier tous les non-directs par seed puis mélanger
-    orderedQuals = shuffle(qualEntries)
+        if (entry) qualifiedEntries.push(entry)
+      }
+    }
   }
 
-  // Entries non présentes dans les groupes (sécurité)
-  const inGroupIds = new Set(orderedQuals.map(e => e.id))
-  const ungrouped  = shuffle(qualEntries.filter(e => !inGroupIds.has(e.id)))
+  const qualifiedShuffled = shuffle(qualifiedEntries)
 
-  // Ordre final : directs seedés → directs non-seedés → qualifiés groupes → non groupés
-  const allToPlace = [...directAll, ...orderedQuals, ...ungrouped]
+  // ── Validation ────────────────────────────────────────────────────────────────
+  const totalTeams = directSeeded.length + directUnseeded.length + qualifiedShuffled.length
+  if (totalTeams < 2) {
+    return NextResponse.json({
+      error: groups.length === 0
+        ? 'Aucune équipe éligible. Vérifiez les inscriptions et les groupes.'
+        : `Pas assez d'équipes : ${directSeeded.length} tête(s) de série + ${qualifiedShuffled.length} qualifié(s). Augmentez le nombre de qualifiés par groupe.`,
+    }, { status: 400 })
+  }
 
-  // ── Construire le draw ─────────────────────────────────────────────────────
-  const drawSize = drawSizeForPairs(t.max_pairs)
-  type Slot = { entryId: string | null; label: string; seed?: number; isBye: boolean }
-  const slots: Slot[] = Array.from({ length: drawSize }, () => ({ entryId: null, label: 'BYE', isBye: true }))
+  // ── Construire le draw ────────────────────────────────────────────────────────
+  const drawSize = nextPow2(totalTeams)
+  const byeCount = drawSize - totalTeams
 
-  const seedPos = SEED_POSITIONS[drawSize] ?? SEED_POSITIONS[32]!
+  const slots: Slot[] = Array.from({ length: drawSize }, () => ({
+    entryId: null, label: 'BYE', isBye: true,
+  }))
 
-  // 1. Placer les directs seedés aux positions FIP
+  // 1. Têtes de série aux positions FIP
+  const seedPos = SEED_POSITIONS[drawSize] ?? Array.from({ length: drawSize }, (_, i) => i)
   directSeeded.forEach((e, i) => {
     const pos = seedPos[i]
-    if (pos !== undefined) {
-      slots[pos] = {
-        entryId: e.id,
-        label:   `[${e.seed}] ${e.player1_name ?? ''} / ${e.player2_name ?? ''}`,
-        seed:    e.seed ?? undefined,
-        isBye:   false,
-      }
-    }
+    if (pos !== undefined) slots[pos] = entrySlot(e)
   })
 
-  // 2. Placer tous les autres dans les slots vides (mélangés)
+  // 2. Directs non-seedés + qualifiés dans les slots restants (mélangés)
   const takenPositions = new Set(slots.map((s, i) => s.entryId ? i : -1).filter(i => i >= 0))
-  const freePositions  = shuffle(slots.map((_, i) => i).filter(i => !takenPositions.has(i)))
+  const freePositions  = shuffle(
+    Array.from({ length: drawSize }, (_, i) => i).filter(i => !takenPositions.has(i))
+  )
 
-  // Paires à placer : directs non-seedés + qualifiés groupes + non groupés
-  const toPlace = [...directUnseeded, ...orderedQuals, ...ungrouped]
-  toPlace.forEach((e, idx) => {
+  ;[...directUnseeded, ...qualifiedShuffled].forEach((e, idx) => {
     const pos = freePositions[idx]
-    if (pos !== undefined) {
-      const isQual = !e.is_direct_entry
-      slots[pos] = {
-        entryId: e.id,
-        label:   isQual
-          ? `${e.player1_name ?? '?'} / ${e.player2_name ?? '?'}`
-          : `${e.player1_name ?? '?'} / ${e.player2_name ?? '?'}`,
-        seed:  e.seed ?? undefined,
-        isBye: false,
-      }
-    }
+    if (pos !== undefined) slots[pos] = entrySlot(e)
   })
 
-  // ── Nettoyer anciens matchs main draw ──────────────────────────────────────
+  // ── Nettoyer anciens matchs draw ──────────────────────────────────────────────
   await admin.from('matches').delete().eq('tournament_id', t.id).neq('phase', 'qualification')
 
-  // ── Créer les matchs du premier tour ──────────────────────────────────────
+  // ── Créer les matchs R1 ───────────────────────────────────────────────────────
   const phase = firstRoundPhase(drawSize)
   const matchInserts: Record<string, unknown>[] = []
   for (let i = 0; i < drawSize; i += 2) {
-    const s1    = slots[i]!
-    const s2    = slots[i + 1]!
-    const isBye = s1.isBye || s2.isBye
+    const s1 = slots[i]!
+    const s2 = slots[i + 1]!
     matchInserts.push({
       tournament_id: t.id,
       phase,
       format:        t.format,
       match_number:  i / 2,
-      status:        isBye ? 'bye' : 'scheduled',
+      status:        (s1.isBye || s2.isBye) ? 'bye' : 'scheduled',
       entry1_id:     s1.isBye ? null : (s1.entryId ?? null),
       entry2_id:     s2.isBye ? null : (s2.entryId ?? null),
-      notes:         isBye ? 'BYE' : null,
+      notes:         null,
     })
   }
-
   await admin.from('matches').insert(matchInserts as never[])
 
   return NextResponse.json({
     ok:       true,
     drawSize,
-    slots:    slots.map((s, i) => ({ position: i, ...s })),
+    totalTeams,
+    byeCount,
+    directCount:    directSeeded.length + directUnseeded.length,
+    qualifiedCount: qualifiedShuffled.length,
+    slots: slots.map((s, i) => ({ position: i, ...s })),
     phase,
   })
 }

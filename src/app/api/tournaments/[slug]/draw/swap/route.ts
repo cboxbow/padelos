@@ -1,6 +1,9 @@
 /**
  * POST /api/tournaments/[slug]/draw/swap
- * Échange deux entrées dans le tableau (swaps their positions in R1 matches).
+ * Échange deux slots du tableau (positions R1).
+ * Fonctionne avec n'importe quelle combinaison : équipe↔équipe, équipe↔BYE, BYE↔BYE.
+ *
+ * Body : { positionA: number, positionB: number }
  */
 
 import { NextResponse }      from 'next/server'
@@ -11,10 +14,17 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { TableRow }     from '@/types'
 
 type TournRow = Pick<TableRow<'tournaments'>, 'id' | 'org_id'>
+type MatchRow = {
+  id:           string
+  match_number: number | null
+  entry1_id:    string | null
+  entry2_id:    string | null
+  status:       string | null
+}
 
 const bodySchema = z.object({
-  entryIdA: z.string().uuid(),
-  entryIdB: z.string().uuid(),
+  positionA: z.number().int().min(0),
+  positionB: z.number().int().min(0),
 })
 
 export async function POST(
@@ -43,46 +53,66 @@ export async function POST(
   const parsed = bodySchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.errors[0]?.message }, { status: 422 })
 
-  const { entryIdA, entryIdB } = parsed.data
+  const { positionA, positionB } = parsed.data
+  if (positionA === positionB) return NextResponse.json({ ok: true })
 
-  // Trouver les matchs R1 contenant chaque entrée
-  type MatchRow = { id: string; entry1_id: string | null; entry2_id: string | null }
+  // Position → match_number + slot index (0 = entry1, 1 = entry2)
+  const matchNumA = Math.floor(positionA / 2)
+  const slotIdxA  = positionA % 2
+  const matchNumB = Math.floor(positionB / 2)
+  const slotIdxB  = positionB % 2
 
   const { data: matchesData } = await admin
     .from('matches')
-    .select('id, entry1_id, entry2_id')
+    .select('id, match_number, entry1_id, entry2_id, status')
     .eq('tournament_id', tournament.id)
     .neq('phase', 'qualification')
-    .or(`entry1_id.eq.${entryIdA},entry2_id.eq.${entryIdA},entry1_id.eq.${entryIdB},entry2_id.eq.${entryIdB}`)
+    .in('match_number', [matchNumA, matchNumB])
 
   const matches = (matchesData ?? []) as MatchRow[]
+  const matchA  = matches.find(m => m.match_number === matchNumA)
+  const matchB  = matches.find(m => m.match_number === matchNumB)
 
-  const matchA = matches.find(m => m.entry1_id === entryIdA || m.entry2_id === entryIdA)
-  const matchB = matches.find(m => m.entry1_id === entryIdB || m.entry2_id === entryIdB)
+  if (!matchA || !matchB) {
+    return NextResponse.json({ error: 'Matchs introuvables' }, { status: 404 })
+  }
 
-  if (!matchA || !matchB) return NextResponse.json({ error: 'Entrées introuvables dans le tableau' }, { status: 404 })
+  // Valeurs actuelles des deux slots
+  const valA = slotIdxA === 0 ? matchA.entry1_id : matchA.entry2_id
+  const valB = slotIdxB === 0 ? matchB.entry1_id : matchB.entry2_id
 
-  // Swap : remplacer A par B et B par A dans leurs matchs respectifs
-  const updatesA: Record<string, string | null> = {}
-  if (matchA.entry1_id === entryIdA) updatesA.entry1_id = entryIdB
-  else                                updatesA.entry2_id = entryIdB
-
-  const updatesB: Record<string, string | null> = {}
-  if (matchB.entry1_id === entryIdB) updatesB.entry1_id = entryIdA
-  else                                updatesB.entry2_id = entryIdA
-
-  // Si même match (A et B dans le même match R1) → juste les inverser
   if (matchA.id === matchB.id) {
+    // Même match — inverser entry1/entry2
+    const newStatus = (matchA.entry1_id == null || matchA.entry2_id == null) ? 'bye' : 'scheduled'
     await admin.from('matches').update({
-      entry1_id: matchA.entry1_id === entryIdA ? entryIdB : entryIdA,
-      entry2_id: matchA.entry2_id === entryIdA ? entryIdB : entryIdA,
+      entry1_id: valB,
+      entry2_id: valA,
+      status:    newStatus,
     } as never).eq('id', matchA.id)
   } else {
+    // Matches différents — swap croisé
+    const updA: Record<string, unknown> = slotIdxA === 0
+      ? { entry1_id: valB }
+      : { entry2_id: valB }
+    const updB: Record<string, unknown> = slotIdxB === 0
+      ? { entry1_id: valA }
+      : { entry2_id: valA }
+
+    // Recalculer le statut après swap
+    const newStatusA = determineStatus(slotIdxA === 0 ? valB : matchA.entry1_id, slotIdxA === 1 ? valB : matchA.entry2_id)
+    const newStatusB = determineStatus(slotIdxB === 0 ? valA : matchB.entry1_id, slotIdxB === 1 ? valA : matchB.entry2_id)
+    updA.status = newStatusA
+    updB.status = newStatusB
+
     await Promise.all([
-      admin.from('matches').update(updatesA as never).eq('id', matchA.id),
-      admin.from('matches').update(updatesB as never).eq('id', matchB.id),
+      admin.from('matches').update(updA as never).eq('id', matchA.id),
+      admin.from('matches').update(updB as never).eq('id', matchB.id),
     ])
   }
 
   return NextResponse.json({ ok: true })
+}
+
+function determineStatus(e1: string | null | undefined, e2: string | null | undefined): string {
+  return (e1 == null || e2 == null) ? 'bye' : 'scheduled'
 }

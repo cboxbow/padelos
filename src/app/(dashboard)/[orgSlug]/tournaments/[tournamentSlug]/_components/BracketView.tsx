@@ -211,34 +211,56 @@ function DraggableSlot({
   slot: BracketSlot; canEdit: boolean; isSwapping: boolean
 }) {
   const id = `pos-${slot.position}`
-  const draggable = useDraggable({ id, disabled: !canEdit || !slot.entryId || slot.isBye })
-  const droppable = useDroppable({ id, disabled: !canEdit || slot.isBye })
+  // ALL slots are draggable when canEdit (including BYEs — admin can move them)
+  const draggable = useDraggable({ id, disabled: !canEdit })
+  const droppable = useDroppable({ id, disabled: !canEdit })
 
   function setRef(el: HTMLElement | null) {
     draggable.setNodeRef(el)
     droppable.setNodeRef(el)
   }
 
-  if (slot.isBye) return <ByeSlot />
+  const isBye = slot.isBye
+  const isOver = droppable.isOver
+  const isDragging = draggable.isDragging
 
-  const canDrag = canEdit && !!slot.entryId
+  if (isBye) {
+    return (
+      <div
+        ref={setRef}
+        {...(canEdit ? draggable.attributes : {})}
+        {...(canEdit ? draggable.listeners : {})}
+        className={cn(
+          'flex items-center gap-1 px-2 bg-court/50 border border-dashed border-border/40 touch-none select-none overflow-hidden',
+          canEdit   && 'cursor-grab active:cursor-grabbing hover:border-border hover:bg-court-panel/40',
+          isDragging && 'opacity-40',
+          isOver     && 'ring-1 ring-inset ring-gold/40 bg-gold/5 border-gold/30',
+          isSwapping && 'opacity-60 animate-pulse',
+        )}
+        style={{ height: CELL_H }}
+      >
+        {canEdit && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground/20" />}
+        <span className="font-mono text-[10px] text-muted-foreground/30 uppercase tracking-widest">BYE</span>
+      </div>
+    )
+  }
 
   return (
     <div
       ref={setRef}
-      {...(canDrag ? draggable.attributes : {})}
-      {...(canDrag ? draggable.listeners : {})}
+      {...(canEdit ? draggable.attributes : {})}
+      {...(canEdit ? draggable.listeners : {})}
       className={cn(
         'flex items-center gap-1 px-2 bg-court-card border border-border touch-none select-none overflow-hidden',
-        slot.seed     && 'bg-gold/5 border-gold/20',
-        canDrag       && 'cursor-grab active:cursor-grabbing hover:border-gold/30',
-        draggable.isDragging && 'opacity-40',
-        droppable.isOver     && 'ring-1 ring-inset ring-gold/60 bg-gold/10 border-gold/40',
-        isSwapping           && 'opacity-60 animate-pulse',
+        slot.seed  && 'bg-gold/5 border-gold/20',
+        canEdit    && 'cursor-grab active:cursor-grabbing hover:border-gold/30',
+        isDragging && 'opacity-40',
+        isOver     && 'ring-1 ring-inset ring-gold/60 bg-gold/10 border-gold/40',
+        isSwapping && 'opacity-60 animate-pulse',
       )}
       style={{ height: CELL_H }}
     >
-      {canDrag && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground/25" />}
+      {canEdit && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground/25" />}
       <div className="min-w-0 flex-1 flex items-center gap-1">
         {slot.seed && (
           <span className="font-mono text-[10px] text-gold shrink-0 flex items-center gap-0.5">
