@@ -7,6 +7,7 @@ import { Shuffle, ChevronRight, ArrowRight, ArrowLeft, Crown } from 'lucide-reac
 import { Button }                  from '@/components/ui/button'
 import { calcGroupCount }          from '@/lib/tournament/draw-generator'
 import type { TableRow }           from '@/types'
+import { DndGroupsProvider, DroppableGroup } from './DndGroupsTab'
 
 type TournRow  = Pick<TableRow<'tournaments'>, 'id' | 'slug' | 'status' | 'max_pairs' | 'format'>
 type EntryRow  = TableRow<'tournament_entries'>
@@ -239,60 +240,91 @@ export function GroupsTab({
 
       {/* ── Mode post-génération : groupes éditables ── */}
       {hasGroups && (
-        <div className="space-y-5">
-          <div className="flex items-center gap-2 text-xs font-body text-muted-foreground bg-court-card border border-border rounded-lg px-3 py-2">
-            <Shuffle className="h-3.5 w-3.5 text-gold" />
-            Groupes actifs — utilisez les menus pour déplacer les paires
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {groups.map(group => {
-              const members = groupEntries.filter(ge => ge.group_id === group.id)
-              const matches = groupMatches.filter(m => m.group_id === group.id)
-              const label   = group.name.replace('Groupe ', '')
-              const otherGroups = groups.filter(g => g.id !== group.id)
-
-              return (
-                <GroupCard
-                  key={group.id} label={label} members={members} matches={matches}
-                  entryLabel={entryLabel} groups={otherGroups} moving={moving}
-                  onMove={(entryId, toGroupId) => moveEntry(entryId, toGroupId)}
-                />
-              )
-            })}
-
-            {/* Draw Direct post-génération */}
-            {directEntries.length > 0 && (
-              <div className="rounded-xl border border-gold/20 bg-gold/5 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-display text-base tracking-widest text-gold">DIRECT</h3>
-                  <span className="font-mono text-xs text-muted-foreground">{directEntries.length}</span>
-                </div>
-                <ul className="space-y-1.5">
-                  {directEntries.map(e => (
-                    <li key={e.id} className="flex items-center gap-2 text-xs font-body">
-                      {e.seed && <Crown className="h-3 w-3 text-gold shrink-0" />}
-                      <span className="text-foreground truncate flex-1">{e.player1_name} / {e.player2_name}</span>
-                      {canEdit && (
-                        <select
-                          className="text-[10px] font-mono bg-court border border-border rounded px-1 py-0.5 text-muted-foreground"
-                          defaultValue=""
-                          disabled={moving === e.id}
-                          onChange={ev => { if (ev.target.value) moveEntry(e.id, ev.target.value) }}
-                        >
-                          <option value="">Déplacer…</option>
-                          {groups.map(g => (
-                            <option key={g.id} value={g.id}>{g.name}</option>
-                          ))}
-                        </select>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+        <DndGroupsProvider
+          tournamentSlug={tournamentSlug}
+          groups={groups}
+          groupEntries={groupEntries}
+          entries={entries}
+          canEdit={canEdit}
+          onGroupEntriesChange={setGroupEntries}
+        >
+          {({ groupEntries: liveGE, onMove, moving: dndMoving }) => (
+            <div className="space-y-5">
+              <div className="flex items-center gap-2 text-xs font-body text-muted-foreground bg-court-card border border-border rounded-lg px-3 py-2">
+                <Shuffle className="h-3.5 w-3.5 text-gold" />
+                Glissez les paires entre les groupes · utilisez le menu pour changer de groupe ou passer en Draw Direct
               </div>
-            )}
-          </div>
-        </div>
+
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {groups.map(group => {
+                  const members     = liveGE.filter(ge => ge.group_id === group.id)
+                                             .sort((a, b) => (a.position ?? 99) - (b.position ?? 99))
+                  const matches     = groupMatches.filter(m => m.group_id === group.id)
+                  const label       = group.name.replace('Groupe ', '')
+                  const otherGroups = groups.filter(g => g.id !== group.id)
+
+                  return (
+                    <div key={group.id} className={`rounded-xl border p-4 space-y-3 ${LABEL_COLORS[label] ?? 'border-border bg-court-card'}`}>
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-display text-2xl tracking-widest text-foreground">Groupe {label}</h3>
+                        <span className="font-mono text-xs text-muted-foreground">{members.length} paires</span>
+                      </div>
+                      <DroppableGroup
+                        group={group} members={members} entryLabel={entryLabel}
+                        groups={otherGroups} tournamentSlug={tournamentSlug}
+                        onMove={onMove} canEdit={canEdit}
+                      />
+                      {matches.length > 0 && (
+                        <div>
+                          <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1.5">
+                            {matches.length} match{matches.length > 1 ? 's' : ''}
+                          </p>
+                          <ul className="space-y-1">
+                            {matches.map(m => (
+                              <li key={m.id} className="flex items-center gap-1.5 text-[11px] font-body text-muted-foreground">
+                                <span className="font-mono text-gold w-6">{m.notes}</span>
+                                <ChevronRight className="h-3 w-3 opacity-40" />
+                                <span className="truncate">{entryLabel(m.entry1_id ?? '')} <span className="opacity-40">vs</span> {entryLabel(m.entry2_id ?? '')}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+
+                {/* Draw Direct */}
+                {directEntries.length > 0 && (
+                  <div className="rounded-xl border border-gold/20 bg-gold/5 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-display text-base tracking-widest text-gold">DIRECT</h3>
+                      <span className="font-mono text-xs text-muted-foreground">{directEntries.length}</span>
+                    </div>
+                    <ul className="space-y-1.5">
+                      {directEntries.map(e => (
+                        <li key={e.id} className="flex items-center gap-2 text-xs font-body bg-court-card rounded px-2 py-1.5">
+                          {e.seed && <Crown className="h-3 w-3 text-gold shrink-0" />}
+                          <span className="text-foreground truncate flex-1">{e.player1_name} / {e.player2_name}</span>
+                          {canEdit && (
+                            <select
+                              className="text-[10px] font-mono bg-court border border-border rounded px-1 py-0.5 text-muted-foreground"
+                              defaultValue="" disabled={dndMoving === e.id}
+                              onChange={ev => { if (ev.target.value) onMove(e.id, ev.target.value) }}
+                            >
+                              <option value="">Déplacer…</option>
+                              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                            </select>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DndGroupsProvider>
       )}
     </div>
   )
