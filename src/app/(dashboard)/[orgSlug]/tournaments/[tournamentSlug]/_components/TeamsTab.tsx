@@ -13,6 +13,7 @@ import {
   Form, FormControl, FormField, FormItem, FormLabel, FormMessage,
 } from '@/components/ui/form'
 import type { TableRow } from '@/types'
+import { ImportPairesDialog } from './ImportPairesDialog'
 
 type EntryRow  = TableRow<'tournament_entries'>
 type TournRow  = Pick<TableRow<'tournaments'>, 'id' | 'slug' | 'status' | 'max_pairs'>
@@ -77,15 +78,23 @@ export function TeamsTab({ tournamentSlug, tournament, initialEntries }: TeamsTa
 
   return (
     <div className="space-y-6">
-      {/* Compteur */}
-      <div className="flex items-center gap-3">
-        <span className="font-body text-sm text-muted-foreground">
-          <span className="text-foreground font-semibold">{entries.length}</span> / {tournament.max_pairs} paires inscrites
-        </span>
-        {entries.length >= tournament.max_pairs && (
-          <span className="text-xs font-body text-amber-400 bg-amber-950/40 border border-amber-800 px-2 py-0.5 rounded-full">
-            Tableau complet
+      {/* Compteur + bouton import */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="font-body text-sm text-muted-foreground">
+            <span className="text-foreground font-semibold">{entries.length}</span> / {tournament.max_pairs} paires inscrites
           </span>
+          {entries.length >= tournament.max_pairs && (
+            <span className="text-xs font-body text-amber-400 bg-amber-950/40 border border-amber-800 px-2 py-0.5 rounded-full">
+              Tableau complet
+            </span>
+          )}
+        </div>
+        {canAdd && (
+          <ImportPairesDialog
+            tournamentSlug={tournamentSlug}
+            onImported={(newEntries) => setEntries(prev => [...prev, ...newEntries])}
+          />
         )}
       </div>
 
