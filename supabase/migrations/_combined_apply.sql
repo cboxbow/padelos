@@ -226,7 +226,7 @@ CREATE TABLE tournaments (
                                 )),
   format            TEXT        NOT NULL DEFAULT 'FORMAT_B'
                                 CHECK (format IN (
-                                  'FORMAT_A', 'FORMAT_B', 'FORMAT_C', 'FORMAT_D'
+                                  'FORMAT_A', 'FORMAT_B', 'FORMAT_C', 'FORMAT_D', 'FORMAT_E'
                                 )),
   start_date        DATE        NOT NULL,
   end_date          DATE        NOT NULL,
@@ -471,7 +471,7 @@ CREATE TABLE matches (
   match_number    INTEGER,    -- numéro dans le bracket (position Seeding Draw)
   format          TEXT        NOT NULL DEFAULT 'FORMAT_B'
                               CHECK (format IN (
-                                'FORMAT_A', 'FORMAT_B', 'FORMAT_C', 'FORMAT_D'
+                                'FORMAT_A', 'FORMAT_B', 'FORMAT_C', 'FORMAT_D', 'FORMAT_E'
                               )),
   status          TEXT        NOT NULL DEFAULT 'scheduled'
                               CHECK (status IN (

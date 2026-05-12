@@ -94,6 +94,7 @@ export const MATCH_FORMAT_LABELS = {
   FORMAT_B: 'Format B — 2 sets + super TB décisif si 1-1',
   FORMAT_C: 'Format C — 1 set + super TB décisif si 6-6',
   FORMAT_D: 'Format D — Set court (premier à 4 jeux)',
+  FORMAT_E: 'Format E — 1 tie-break à 10 points',
 } as const
 
 export const MATCH_FORMAT_SHORT = {
@@ -101,6 +102,7 @@ export const MATCH_FORMAT_SHORT = {
   FORMAT_B: '2 sets + TB',
   FORMAT_C: '1 set + TB',
   FORMAT_D: '4 jeux',
+  FORMAT_E: 'TB 10 pts',
 } as const
 
 /** Description longue pour affichage dans les pages publiques / référence règles. */
@@ -109,6 +111,7 @@ export const MATCH_FORMAT_DESC = {
   FORMAT_B: '2 sets de 6 jeux (sans tiebreak régulier). Super tiebreak à 10 pts si 1-1.',
   FORMAT_C: '1 set de 6 jeux. Super tiebreak décisif à 10 pts si 6-6.',
   FORMAT_D: '1 set court — premier à 4 jeux. Pas de tiebreak.',
+  FORMAT_E: '1 tie-break à 10 points (2 pts d\'écart min, golden point à 10-10).',
 } as const
 
 // ─── Rôles ───────────────────────────────────────────────────────────────────

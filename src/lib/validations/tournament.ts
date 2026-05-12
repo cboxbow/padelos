@@ -8,7 +8,7 @@ const CATEGORIES = [
   'JUNIOR_U11','JUNIOR_U13','JUNIOR_U15',
 ] as const
 
-const FORMATS = ['FORMAT_A','FORMAT_B','FORMAT_C','FORMAT_D'] as const
+const FORMATS = ['FORMAT_A','FORMAT_B','FORMAT_C','FORMAT_D','FORMAT_E'] as const
 
 // ─── Schéma création ─────────────────────────────────────────────────────────
 

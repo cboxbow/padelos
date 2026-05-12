@@ -42,6 +42,7 @@ const FORMAT_OPTIONS = [
   { value: 'FORMAT_B', label: 'Format B — 2 sets + super TB décisif si 1-1' },
   { value: 'FORMAT_C', label: 'Format C — 1 set + super TB décisif si 6-6' },
   { value: 'FORMAT_D', label: 'Format D — Set court (premier à 4 jeux)' },
+  { value: 'FORMAT_E', label: 'Format E — 1 tie-break à 10 points' },
 ]
 
 const MAX_PAIRS_OPTIONS = [4, 8, 16, 24, 32, 48, 64, 96, 128]

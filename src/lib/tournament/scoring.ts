@@ -5,6 +5,7 @@
  * FORMAT_B : 2 sets (6 jeux/set, sans TB régulier), super TB si 1-1 sets
  * FORMAT_C : 1 set (6 jeux), super TB décisif si 6-6 dans le set
  * FORMAT_D : 1 set court, premier à 4 jeux (pas de tiebreak)
+ * FORMAT_E : 1 tie-break à 10 points (super TB seul, pas de sets)
  *
  * Super TB : first to 10, min 2 pts d'écart, golden point à 10-10
  */
@@ -31,7 +32,11 @@ export type MatchPlayer = 'e1' | 'e2'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-export function initialScore(serving: MatchPlayer | null = null): MatchScore {
+export function initialScore(serving: MatchPlayer | null = null, format?: MatchFormat): MatchScore {
+  // FORMAT_E : super TB seul, pas de sets
+  if (format === 'FORMAT_E') {
+    return { sets: [], superTb: { e1: 0, e2: 0 }, serving, goldenPoint: false }
+  }
   return { sets: [{ e1: 0, e2: 0 }], serving, goldenPoint: false }
 }
 
@@ -66,6 +71,9 @@ export function checkMatchComplete(score: MatchScore, format: MatchFormat): {
   complete: boolean
   winner:   MatchPlayer | null
 } {
+  // FORMAT_E : super TB seul — géré par le bloc superTb ci-dessous
+  // (le score est initialisé avec superTb directement)
+
   // FORMAT_D : first to 4 games
   if (format === 'FORMAT_D') {
     const s = score.sets[0]
@@ -110,7 +118,7 @@ export function checkMatchComplete(score: MatchScore, format: MatchFormat): {
  * FORMAT_C utilise needsSuperTiebreakC (déclenchement dans le set à 6-6).
  */
 export function needsSuperTiebreak(score: MatchScore, format: MatchFormat): boolean {
-  if (format === 'FORMAT_D' || format === 'FORMAT_C') return false
+  if (format === 'FORMAT_D' || format === 'FORMAT_C' || format === 'FORMAT_E') return false
   if (score.superTb) return false
   const sw = setsWon(score)
   return sw.e1 === 1 && sw.e2 === 1
@@ -138,7 +146,7 @@ export function needsRegularTiebreak(score: MatchScore, format: MatchFormat): bo
  * Retourne un nouveau MatchScore (immutable).
  */
 export function addGame(score: MatchScore, format: MatchFormat, player: MatchPlayer): MatchScore {
-  // En super TB → addSuperTbPoint
+  // FORMAT_E / super TB actif → addSuperTbPoint
   if (score.superTb) return addSuperTbPoint(score, player)
 
   const sets   = score.sets.map(s => ({ ...s, tb: s.tb ? { ...s.tb } : undefined }))

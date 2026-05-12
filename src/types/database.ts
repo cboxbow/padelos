@@ -32,7 +32,7 @@ export type TournamentCategory =
 
 export type TournamentStatus = 'draft' | 'registration' | 'active' | 'completed' | 'cancelled'
 
-export type MatchFormat = 'FORMAT_A' | 'FORMAT_B' | 'FORMAT_C' | 'FORMAT_D'
+export type MatchFormat = 'FORMAT_A' | 'FORMAT_B' | 'FORMAT_C' | 'FORMAT_D' | 'FORMAT_E'
 
 export type EntryStatus = 'pending' | 'confirmed' | 'waitlist' | 'withdrawn' | 'disqualified'
 
