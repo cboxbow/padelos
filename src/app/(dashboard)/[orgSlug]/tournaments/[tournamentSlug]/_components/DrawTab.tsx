@@ -61,16 +61,20 @@ export function DrawTab({ tournamentSlug, tournament, initialMatches, entries, g
     return out
   }
 
-  function makeSlot(pos: number, entry: EntryRow | null | undefined, isBye: boolean): BracketSlot {
-    if (isBye || !entry) return { position: pos, entryId: null, label: 'BYE', isQualifier: false, isBye: true }
-    return {
-      position:    pos,
-      entryId:     entry.id,
-      label:       `${entry.player1_name ?? '?'} / ${entry.player2_name ?? '?'}`,
-      seed:        entry.seed ?? undefined,
-      isQualifier: !entry.seed,
-      isBye:       false,
+  function makeSlot(pos: number, entry: EntryRow | null | undefined, _matchIsBye: boolean): BracketSlot {
+    // Always show a real entry, even when the match is a bye (opponent = BYE)
+    if (entry) {
+      return {
+        position:    pos,
+        entryId:     entry.id,
+        label:       `${entry.player1_name ?? '?'} / ${entry.player2_name ?? '?'}`,
+        seed:        entry.seed ?? undefined,
+        isQualifier: !entry.seed,
+        isBye:       false,
+      }
     }
+    // No entry linked → genuine BYE slot
+    return { position: pos, entryId: null, label: 'BYE', isQualifier: false, isBye: true }
   }
 
   function generate() {

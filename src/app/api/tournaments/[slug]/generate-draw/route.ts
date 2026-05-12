@@ -5,9 +5,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { TableRow, MatchPhase } from '@/types'
 
 type TournRow  = Pick<TableRow<'tournaments'>, 'id' | 'format' | 'org_id' | 'status' | 'max_pairs'>
-type EntryRow  = Pick<TableRow<'tournament_entries'>, 'id' | 'seed' | 'status' | 'player1_name' | 'player2_name'>
+type EntryRow  = Pick<TableRow<'tournament_entries'>, 'id' | 'seed' | 'player1_name' | 'player2_name' | 'is_direct_entry'>
 type GroupRow  = Pick<TableRow<'qual_groups'>, 'id' | 'group_index' | 'name'>
-type GEntryRow = Pick<TableRow<'qual_group_entries'>, 'entry_id' | 'group_id' | 'position' | 'points'>
+type GEntryRow = Pick<TableRow<'qual_group_entries'>, 'entry_id' | 'group_id' | 'position'>
 
 // ─── Seed positions (FIP-compliant) ──────────────────────────────────────────
 
@@ -29,8 +29,6 @@ function firstRoundPhase(drawSize: number): MatchPhase {
   return 'round_of_32'
 }
 
-// ─── Shuffle (Fisher-Yates) ───────────────────────────────────────────────────
-
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
@@ -50,16 +48,17 @@ export async function POST(
   const supabase = await createClient()
   const admin    = createAdminClient()
 
-  // Auth + admin check
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
 
-  const tRes = await supabase.from('tournaments').select('id, format, org_id, status, max_pairs').eq('slug', slug).maybeSingle()
-  const t    = tRes.data as TournRow | null
+  const tRes = await supabase.from('tournaments')
+    .select('id, format, org_id, status, max_pairs').eq('slug', slug).maybeSingle()
+  const t = tRes.data as TournRow | null
   if (!t) return NextResponse.json({ error: 'Tournoi introuvable' }, { status: 404 })
 
-  const mRes = await supabase.from('org_members').select('role').eq('org_id', t.org_id).eq('user_id', user.id).maybeSingle()
-  const m    = mRes.data as { role: string } | null
+  const mRes = await supabase.from('org_members').select('role')
+    .eq('org_id', t.org_id).eq('user_id', user.id).maybeSingle()
+  const m = mRes.data as { role: string } | null
   if (!m || !['super_admin','federation_admin','club_admin'].includes(m.role)) {
     return NextResponse.json({ error: 'Droits insuffisants' }, { status: 403 })
   }
@@ -69,76 +68,132 @@ export async function POST(
   }
 
   // ── Récupérer les inscriptions ─────────────────────────────────────────────
-  const { data: eData } = await supabase.from('tournament_entries').select('id, seed, status, player1_name, player2_name').eq('tournament_id', t.id).not('status', 'eq', 'withdrawn')
+  const { data: eData } = await supabase
+    .from('tournament_entries')
+    .select('id, seed, player1_name, player2_name, is_direct_entry')
+    .eq('tournament_id', t.id)
+    .not('status', 'eq', 'withdrawn')
   const allEntries = (eData ?? []) as EntryRow[]
 
-  // Seeds directs (confirmed + seed set)
-  const directEntries = allEntries.filter(e => e.seed !== null && e.status === 'confirmed').sort((a, b) => (a.seed ?? 99) - (b.seed ?? 99))
+  if (allEntries.length === 0) {
+    return NextResponse.json({ error: 'Aucune inscription trouvée.' }, { status: 400 })
+  }
 
-  // Qualifiés : top 1 de chaque groupe (position=0)
-  const { data: gData  } = await supabase.from('qual_groups').select('id, group_index, name').eq('tournament_id', t.id).order('group_index')
+  // ── Catégoriser les entrées ────────────────────────────────────────────────
+  // Direct entries (is_direct_entry = true) : placées aux positions FIP par seed
+  const directSeeded = allEntries
+    .filter(e => e.is_direct_entry && e.seed !== null)
+    .sort((a, b) => (a.seed ?? 99) - (b.seed ?? 99))
+  const directUnseeded = shuffle(allEntries.filter(e => e.is_direct_entry && e.seed === null))
+  const directAll = [...directSeeded, ...directUnseeded]
+
+  // Entries de qualification (passent par les groupes)
+  const qualEntryIds = new Set(directAll.map(e => e.id))
+  const qualEntries  = allEntries.filter(e => !qualEntryIds.has(e.id))
+
+  // ── Récupérer l'ordre dans les groupes ────────────────────────────────────
+  // (position = ordre après matchs; avant matchs = ordre d'insertion)
+  const { data: gData } = await supabase
+    .from('qual_groups').select('id, group_index, name')
+    .eq('tournament_id', t.id).order('group_index')
   const groups = (gData ?? []) as GroupRow[]
 
-  const { data: geData } = await supabase.from('qual_group_entries').select('entry_id, group_id, position, points').in('group_id', groups.map(g => g.id))
-  const groupEntries = (geData ?? []) as GEntryRow[]
+  let orderedQuals: EntryRow[] = []
+  if (groups.length > 0) {
+    const { data: geData } = await supabase
+      .from('qual_group_entries').select('entry_id, group_id, position')
+      .in('group_id', groups.map(g => g.id))
+    const groupEntries = (geData ?? []) as GEntryRow[]
 
-  // Top 1 de chaque groupe (position null after ranking, fallback by points)
-  const qualifiers: Array<{ entryId: string; label: string }> = groups.map(g => {
-    const members = groupEntries.filter(ge => ge.group_id === g.id).sort((a, b) => (a.position ?? 99) - (b.position ?? 99) || b.points - a.points)
-    const label   = `Q${g.name.replace('Groupe ', '')}`  // QA, QB...
-    return { entryId: members[0]?.entry_id ?? '', label }
-  }).filter(q => q.entryId)
+    // Trier par groupe (group_index) puis par position dans le groupe
+    const entryMap = Object.fromEntries(allEntries.map(e => [e.id, e]))
+    const sorted: EntryRow[] = []
+    groups.forEach(g => {
+      const members = groupEntries
+        .filter(ge => ge.group_id === g.id)
+        .sort((a, b) => (a.position ?? 99) - (b.position ?? 99))
+      members.forEach(ge => {
+        const entry = entryMap[ge.entry_id]
+        if (entry && !qualEntryIds.has(ge.entry_id)) sorted.push(entry)
+      })
+    })
+    orderedQuals = sorted
+  } else {
+    // Pas de groupes : trier tous les non-directs par seed puis mélanger
+    orderedQuals = shuffle(qualEntries)
+  }
+
+  // Entries non présentes dans les groupes (sécurité)
+  const inGroupIds = new Set(orderedQuals.map(e => e.id))
+  const ungrouped  = shuffle(qualEntries.filter(e => !inGroupIds.has(e.id)))
+
+  // Ordre final : directs seedés → directs non-seedés → qualifiés groupes → non groupés
+  const allToPlace = [...directAll, ...orderedQuals, ...ungrouped]
 
   // ── Construire le draw ─────────────────────────────────────────────────────
   const drawSize = drawSizeForPairs(t.max_pairs)
-  const slots: Array<{ entryId: string | null; label: string; seed?: number; isBye: boolean }> = Array.from(
-    { length: drawSize },
-    () => ({ entryId: null, label: 'BYE', isBye: true }),
-  )
+  type Slot = { entryId: string | null; label: string; seed?: number; isBye: boolean }
+  const slots: Slot[] = Array.from({ length: drawSize }, () => ({ entryId: null, label: 'BYE', isBye: true }))
 
-  // Place seeds
   const seedPos = SEED_POSITIONS[drawSize] ?? SEED_POSITIONS[32]!
-  directEntries.forEach((e, i) => {
+
+  // 1. Placer les directs seedés aux positions FIP
+  directSeeded.forEach((e, i) => {
     const pos = seedPos[i]
     if (pos !== undefined) {
-      slots[pos] = { entryId: e.id, label: `[${e.seed}] ${e.player1_name ?? ''} / ${e.player2_name ?? ''}`, seed: e.seed ?? undefined, isBye: false }
+      slots[pos] = {
+        entryId: e.id,
+        label:   `[${e.seed}] ${e.player1_name ?? ''} / ${e.player2_name ?? ''}`,
+        seed:    e.seed ?? undefined,
+        isBye:   false,
+      }
     }
   })
 
-  // Place qualifiers in remaining slots (shuffled)
-  const emptyPositions = shuffle(slots.map((s, i) => i).filter(i => !slots[i]?.entryId && !slots[i]?.isBye))
-  const allEmpty       = shuffle(slots.map((s, i) => i).filter(i => slots[i]!.entryId === null))
+  // 2. Placer tous les autres dans les slots vides (mélangés)
+  const takenPositions = new Set(slots.map((s, i) => s.entryId ? i : -1).filter(i => i >= 0))
+  const freePositions  = shuffle(slots.map((_, i) => i).filter(i => !takenPositions.has(i)))
 
-  let qualIdx = 0
-  for (const pos of allEmpty) {
-    if (qualIdx >= qualifiers.length) break
-    const q = qualifiers[qualIdx++]!
-    slots[pos] = { entryId: q.entryId, label: q.label, isBye: false }
-  }
+  // Paires à placer : directs non-seedés + qualifiés groupes + non groupés
+  const toPlace = [...directUnseeded, ...orderedQuals, ...ungrouped]
+  toPlace.forEach((e, idx) => {
+    const pos = freePositions[idx]
+    if (pos !== undefined) {
+      const isQual = !e.is_direct_entry
+      slots[pos] = {
+        entryId: e.id,
+        label:   isQual
+          ? `${e.player1_name ?? '?'} / ${e.player2_name ?? '?'}`
+          : `${e.player1_name ?? '?'} / ${e.player2_name ?? '?'}`,
+        seed:  e.seed ?? undefined,
+        isBye: false,
+      }
+    }
+  })
 
   // ── Nettoyer anciens matchs main draw ──────────────────────────────────────
   await admin.from('matches').delete().eq('tournament_id', t.id).neq('phase', 'qualification')
 
   // ── Créer les matchs du premier tour ──────────────────────────────────────
   const phase = firstRoundPhase(drawSize)
-  const matchInserts = []
+  const matchInserts: Record<string, unknown>[] = []
   for (let i = 0; i < drawSize; i += 2) {
-    const s1 = slots[i]!
-    const s2 = slots[i + 1]!
+    const s1    = slots[i]!
+    const s2    = slots[i + 1]!
     const isBye = s1.isBye || s2.isBye
     matchInserts.push({
       tournament_id: t.id,
       phase,
-      format:       t.format,
-      match_number: i / 2,
-      status:       isBye ? 'bye' : 'scheduled',
-      entry1_id:    s1.entryId ?? null,
-      entry2_id:    s2.entryId ?? null,
-      notes:        isBye ? 'BYE' : null,
+      format:        t.format,
+      match_number:  i / 2,
+      status:        isBye ? 'bye' : 'scheduled',
+      entry1_id:     s1.isBye ? null : (s1.entryId ?? null),
+      entry2_id:     s2.isBye ? null : (s2.entryId ?? null),
+      notes:         isBye ? 'BYE' : null,
     })
   }
 
-  await admin.from('matches').insert(matchInserts as never)
+  await admin.from('matches').insert(matchInserts as never[])
 
   return NextResponse.json({
     ok:       true,
