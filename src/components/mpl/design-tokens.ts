@@ -90,17 +90,25 @@ export const CATEGORY_GENDER_ICON = {
 // ─── Formats de match ────────────────────────────────────────────────────────
 
 export const MATCH_FORMAT_LABELS = {
-  FORMAT_A: 'Format A — 3 sets',
-  FORMAT_B: 'Format B — 2 sets + super TB',
-  FORMAT_C: 'Format C — 1 set + super TB',
-  FORMAT_D: 'Format D — Set court (4 jeux)',
+  FORMAT_A: 'Format A — 3 sets (TB à 6-6, super TB si 1-1)',
+  FORMAT_B: 'Format B — 2 sets + super TB décisif si 1-1',
+  FORMAT_C: 'Format C — 1 set + super TB décisif si 6-6',
+  FORMAT_D: 'Format D — Set court (premier à 4 jeux)',
 } as const
 
 export const MATCH_FORMAT_SHORT = {
   FORMAT_A: '3 sets',
-  FORMAT_B: '2+TB',
-  FORMAT_C: '1+TB',
+  FORMAT_B: '2 sets + TB',
+  FORMAT_C: '1 set + TB',
   FORMAT_D: '4 jeux',
+} as const
+
+/** Description longue pour affichage dans les pages publiques / référence règles. */
+export const MATCH_FORMAT_DESC = {
+  FORMAT_A: '3 sets de 6 jeux (tiebreak à 6-6). Super tiebreak à 10 pts remplace le 3ème set si 1-1.',
+  FORMAT_B: '2 sets de 6 jeux (sans tiebreak régulier). Super tiebreak à 10 pts si 1-1.',
+  FORMAT_C: '1 set de 6 jeux. Super tiebreak décisif à 10 pts si 6-6.',
+  FORMAT_D: '1 set court — premier à 4 jeux. Pas de tiebreak.',
 } as const
 
 // ─── Rôles ───────────────────────────────────────────────────────────────────

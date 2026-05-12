@@ -38,10 +38,10 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const FORMAT_OPTIONS = [
-  { value: 'FORMAT_A', label: 'Format A — 3 sets (6/6/6)' },
-  { value: 'FORMAT_B', label: 'Format B — 2 sets + super tiebreak' },
-  { value: 'FORMAT_C', label: 'Format C — 1 set + super tiebreak' },
-  { value: 'FORMAT_D', label: 'Format D — Set court (4 jeux)' },
+  { value: 'FORMAT_A', label: 'Format A — 3 sets (TB régulier à 6-6, super TB si 1-1)' },
+  { value: 'FORMAT_B', label: 'Format B — 2 sets + super TB décisif si 1-1' },
+  { value: 'FORMAT_C', label: 'Format C — 1 set + super TB décisif si 6-6' },
+  { value: 'FORMAT_D', label: 'Format D — Set court (premier à 4 jeux)' },
 ]
 
 const MAX_PAIRS_OPTIONS = [4, 8, 16, 24, 32, 48, 64, 96, 128]

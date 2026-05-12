@@ -1,10 +1,10 @@
 /**
  * MPL Scoring Engine — logique FIP par format de match.
  *
- * FORMAT_A : 2 sets (tiebreak régulier à 6-6), super TB si 1-1 sets
- * FORMAT_B : 2 sets (pas de tiebreak régulier), super TB si 1-1 sets
- * FORMAT_C : 1 set, super TB si 6-6 en jeux
- * FORMAT_D : 1 set, premier à 4 jeux (pas de tiebreak)
+ * FORMAT_A : best-of-3 sets (6 jeux/set, TB régulier à 6-6), super TB remplace le 3ème set si 1-1
+ * FORMAT_B : 2 sets (6 jeux/set, sans TB régulier), super TB si 1-1 sets
+ * FORMAT_C : 1 set (6 jeux), super TB décisif si 6-6 dans le set
+ * FORMAT_D : 1 set court, premier à 4 jeux (pas de tiebreak)
  *
  * Super TB : first to 10, min 2 pts d'écart, golden point à 10-10
  */
@@ -105,11 +105,23 @@ export function checkMatchComplete(score: MatchScore, format: MatchFormat): {
 
 // ─── needsSuperTiebreak ───────────────────────────────────────────────────────
 
+/**
+ * Entre-sets super TB (FORMAT_A/B) : true quand les deux joueurs sont à 1 set chacun.
+ * FORMAT_C utilise needsSuperTiebreakC (déclenchement dans le set à 6-6).
+ */
 export function needsSuperTiebreak(score: MatchScore, format: MatchFormat): boolean {
   if (format === 'FORMAT_D' || format === 'FORMAT_C') return false
   if (score.superTb) return false
   const sw = setsWon(score)
   return sw.e1 === 1 && sw.e2 === 1
+}
+
+/** FORMAT_C uniquement : super TB décisif si le set unique atteint 6-6. */
+export function needsSuperTiebreakC(score: MatchScore, format: MatchFormat): boolean {
+  if (format !== 'FORMAT_C') return false
+  if (score.superTb) return false
+  const cur = score.sets.at(-1)
+  return !!cur && cur.e1 === 6 && cur.e2 === 6
 }
 
 /** FORMAT_A: does the current set need a regular tiebreak? (à 6-6) */
@@ -152,10 +164,15 @@ export function addGame(score: MatchScore, format: MatchFormat, player: MatchPla
 
   const next = { ...score, sets }
 
-  // FORMAT_A : si 6-6, ouvrir tiebreak
+  // FORMAT_A : si 6-6, ouvrir tiebreak régulier
   if (needsRegularTiebreak(next, format)) {
     sets[sets.length - 1] = { ...updated, tb: { e1: 0, e2: 0 } }
     return { ...next, sets }
+  }
+
+  // FORMAT_C : si 6-6 dans le set unique, ouvrir super tiebreak décisif
+  if (needsSuperTiebreakC(next, format)) {
+    return { ...next, sets, superTb: { e1: 0, e2: 0 } }
   }
 
   return maybeAdvanceSet(next, format)
