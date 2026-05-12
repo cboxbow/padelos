@@ -144,7 +144,10 @@ export function DrawTab({ tournamentSlug, tournament, initialMatches, entries, g
   const displaySlots = localSlots
     ?? (hasDrawGenerated ? buildSlotsFromMatches(mainDrawMatches) : [])
 
-  const drawSize = Math.max(displaySlots.length, tournament.max_pairs)
+  // Draw size must be a power of 2 for the bracket tree to work
+  function nextPow2(n: number) { return Math.pow(2, Math.ceil(Math.log2(Math.max(n, 2)))) }
+  const rawSize  = Math.max(displaySlots.length, tournament.max_pairs)
+  const drawSize = nextPow2(rawSize)
 
   // Active dragged slot (for overlay)
   const activePosNum = activeSlotId ? posFromDndId(activeSlotId) : -1
@@ -173,15 +176,24 @@ export function DrawTab({ tournamentSlug, tournament, initialMatches, entries, g
         {/* Bracket */}
         {displaySlots.length > 0 ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
               <h3 className="font-display text-lg tracking-wider uppercase text-foreground">
                 Tableau — Draw {drawSize}
               </h3>
               <div className="flex gap-3 text-xs font-body text-muted-foreground">
-                <span><span className="text-gold">■</span> Tête de série</span>
-                <span><span className="text-blue-400">■</span> Qualifié</span>
-                <span><span className="text-muted-foreground/40">■</span> BYE</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-gold/60" /> Tête de série</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-sm bg-border" /> BYE</span>
               </div>
+              {canEdit && (
+                <Button
+                  variant="outline" size="sm"
+                  onClick={generate} disabled={generating}
+                  className="ml-auto text-xs border-border/60 text-muted-foreground hover:text-foreground"
+                >
+                  <Shuffle className="mr-1.5 h-3 w-3" />
+                  {generating ? 'Régénération…' : 'Régénérer'}
+                </Button>
+              )}
             </div>
             <BracketView
               slots={displaySlots}

@@ -1,10 +1,19 @@
 'use client'
 
 import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Crown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CELL_H  = 36   // px — height of one entry slot
+const CONN_W  = 20   // px — width of horizontal connector arm
+const COL_W   = 176  // px — width of one round column
+const ROUND_LABELS: Record<number, string> = {
+  1: 'R32', 2: 'R16', 3: 'Quarts', 4: 'Demies', 5: 'Finale',
+}
+
+// ─── Public types ─────────────────────────────────────────────────────────────
 
 export interface BracketSlot {
   position:    number
@@ -15,132 +24,180 @@ export interface BracketSlot {
   isBye:       boolean
 }
 
-interface BracketMatch {
-  matchNumber: number
-  slot1:       BracketSlot
-  slot2:       BracketSlot
-  winnerId?:   string | null
-}
-
-interface BracketViewProps {
+export interface BracketViewProps {
   slots:     BracketSlot[]
   drawSize:  number
   canEdit?:  boolean
-  swapping?: string | null   // entryId currently being swapped (shows spinner)
+  swapping?: string | null
   className?: string
+}
+
+/** Extract slot position number from a DnD id like "pos-7" */
+export function posFromDndId(id: string): number {
+  return parseInt(id.replace('pos-', ''), 10)
 }
 
 // ─── BracketView ─────────────────────────────────────────────────────────────
 
-export function BracketView({ slots, drawSize, canEdit = false, swapping, className }: BracketViewProps) {
-  const r1Matches: BracketMatch[] = []
-  for (let i = 0; i < drawSize; i += 2) {
-    r1Matches.push({
-      matchNumber: i / 2,
-      slot1: slots[i]   ?? { position: i,   entryId: null, label: 'TBD', isQualifier: false, isBye: false },
-      slot2: slots[i+1] ?? { position: i+1, entryId: null, label: 'TBD', isQualifier: false, isBye: false },
-    })
-  }
-
-  const half      = r1Matches.length / 2
-  const leftHalf  = r1Matches.slice(0, half)
-  const rightHalf = [...r1Matches.slice(half)].reverse()
+export function BracketView({
+  slots, drawSize, canEdit = false, swapping, className,
+}: BracketViewProps) {
+  const numRounds = Math.log2(drawSize)          // 5 for draw-32
+  const totalH    = drawSize * CELL_H            // total bracket height in px
+  const totalW    = numRounds * (COL_W + CONN_W) + COL_W + 16
 
   return (
-    <div className={cn('overflow-x-auto pb-2', className)}>
+    <div className={cn('overflow-x-auto overflow-y-visible pb-4', className)}>
       {canEdit && (
-        <p className="text-xs font-body text-muted-foreground mb-2 flex items-center gap-1">
+        <p className="flex items-center gap-1 text-xs font-body text-muted-foreground mb-3">
           <GripVertical className="h-3 w-3" />
           Glissez les paires pour échanger leurs positions dans le tableau.
         </p>
       )}
-      <div className="min-w-[520px] flex gap-0">
-        {/* LEFT half */}
-        <HalfBracket matches={leftHalf} side="left" drawSize={drawSize} canEdit={canEdit} swapping={swapping} />
 
-        {/* Final center */}
-        <div className="flex flex-col items-center justify-center px-3 min-w-[90px]">
-          <div className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-center">
-            <p className="font-display text-xs tracking-widest uppercase text-gold">Finale</p>
-            <p className="font-body text-xs text-muted-foreground mt-0.5">TBD</p>
+      {/* Round headers */}
+      <div className="flex mb-1" style={{ width: totalW }}>
+        {Array.from({ length: numRounds }, (_, r) => (
+          <div
+            key={r}
+            style={{ width: COL_W + CONN_W }}
+            className="shrink-0 text-center text-[10px] font-display tracking-widest uppercase text-muted-foreground/60 pb-1"
+          >
+            {ROUND_LABELS[r + 1] ?? `R${r + 1}`}
           </div>
-        </div>
-
-        {/* RIGHT half (mirrored) */}
-        <HalfBracket matches={rightHalf} side="right" drawSize={drawSize} canEdit={canEdit} swapping={swapping} />
-      </div>
-    </div>
-  )
-}
-
-// ─── HalfBracket ─────────────────────────────────────────────────────────────
-
-function HalfBracket({
-  matches, side, drawSize, canEdit, swapping,
-}: {
-  matches:   BracketMatch[]
-  side:      'left' | 'right'
-  drawSize:  number
-  canEdit:   boolean
-  swapping?: string | null
-}) {
-  const isLeft = side === 'left'
-
-  return (
-    <div className={cn('flex-1 flex gap-0', isLeft ? 'flex-row' : 'flex-row-reverse')}>
-      {/* R1 column */}
-      <div className="flex flex-col justify-around flex-1">
-        {matches.map(m => (
-          <BracketPair key={m.matchNumber} match={m} side={side} canEdit={canEdit} swapping={swapping} showConnector />
         ))}
+        <div
+          style={{ width: COL_W }}
+          className="shrink-0 text-center text-[10px] font-display tracking-widest uppercase text-gold/70 pb-1"
+        >
+          Champion
+        </div>
       </div>
 
-      {/* Subsequent rounds placeholder */}
-      {drawSize >= 16 && (
-        <div className="flex flex-col justify-around" style={{ width: 100 }}>
-          {Array.from({ length: matches.length / 2 }).map((_, i) => (
-            <div key={i} className={cn('flex items-center', isLeft ? 'justify-start' : 'justify-end')}>
-              <PlaceholderSlot label="→ TBD" />
-            </div>
-          ))}
+      {/* Bracket body — absolutely positioned matches */}
+      <div className="relative" style={{ width: totalW, height: totalH }}>
+        {Array.from({ length: numRounds }, (_, r) => {
+          const numMatches = drawSize / Math.pow(2, r + 1)
+          const matchH     = totalH / numMatches
+
+          return Array.from({ length: numMatches }, (_, m) => {
+            const yTop = m * matchH
+            const xLeft = r * (COL_W + CONN_W)
+
+            const slot1: BracketSlot | undefined = r === 0 ? slots[m * 2]     : undefined
+            const slot2: BracketSlot | undefined = r === 0 ? slots[m * 2 + 1] : undefined
+
+            return (
+              <MatchBlock
+                key={`r${r}m${m}`}
+                x={xLeft}
+                y={yTop}
+                matchH={matchH}
+                slot1={slot1}
+                slot2={slot2}
+                roundIndex={r}
+                isLastRound={r === numRounds - 1}
+                canEdit={canEdit && r === 0}
+                swapping={swapping}
+              />
+            )
+          })
+        })}
+
+        {/* Champion / Winner slot */}
+        <div
+          style={{
+            position: 'absolute',
+            left: numRounds * (COL_W + CONN_W),
+            top:  totalH / 2 - CELL_H / 2,
+            width: COL_W,
+          }}
+        >
+          <ChampionSlot />
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-// ─── BracketPair ─────────────────────────────────────────────────────────────
+// ─── MatchBlock ───────────────────────────────────────────────────────────────
 
-function BracketPair({
-  match, side, canEdit, swapping, showConnector,
+function MatchBlock({
+  x, y, matchH, slot1, slot2, roundIndex, isLastRound, canEdit, swapping,
 }: {
-  match:          BracketMatch
-  side:           'left' | 'right'
-  canEdit:        boolean
-  swapping?:      string | null
-  showConnector?: boolean
+  x: number; y: number; matchH: number
+  slot1?: BracketSlot; slot2?: BracketSlot
+  roundIndex: number; isLastRound: boolean
+  canEdit: boolean; swapping?: string | null
 }) {
-  const isLeft = side === 'left'
+  // Entry 1 at top; entry 2 at bottom; vertical connector between them
+  const entry1Top = 0
+  const entry2Top = matchH - CELL_H
+  const midY      = matchH / 2
+
+  // Vertical arm heights
+  const topArmH    = midY - CELL_H / 2           // from bottom of slot1 to midpoint
+  const bottomArmH = entry2Top - midY + CELL_H / 2 // from midpoint to top of slot2
 
   return (
-    <div className="flex items-stretch my-0.5">
-      <div className={cn('flex flex-col', isLeft ? 'items-end' : 'items-start')}>
-        <div className={cn(
-          'flex items-center border-border border',
-          isLeft ? 'border-r border-b border-t' : 'border-l border-b border-t',
-        )}>
-          <DraggableSlot slot={match.slot1} canEdit={canEdit} isSwapping={swapping === match.slot1.entryId} />
-        </div>
-        <div className={cn(
-          'flex items-center border-border border-x border-b',
-          isLeft ? 'border-r border-b' : 'border-l border-b',
-        )}>
-          <DraggableSlot slot={match.slot2} canEdit={canEdit} isSwapping={swapping === match.slot2.entryId} />
-        </div>
+    <div style={{ position: 'absolute', left: x, top: y, width: COL_W + CONN_W, height: matchH }}>
+      {/* Entry slot 1 */}
+      <div style={{ position: 'absolute', top: entry1Top, width: COL_W }}>
+        {roundIndex === 0 && slot1
+          ? <DraggableSlot slot={slot1} canEdit={canEdit} isSwapping={swapping === slot1.entryId} />
+          : <TbdSlot isFuture={roundIndex > 0} />
+        }
       </div>
 
-      {showConnector && (
-        <div className="w-3 border-border border-t self-center" />
+      {/* Entry slot 2 */}
+      <div style={{ position: 'absolute', top: entry2Top, width: COL_W }}>
+        {roundIndex === 0 && slot2
+          ? <DraggableSlot slot={slot2} canEdit={canEdit} isSwapping={swapping === slot2.entryId} />
+          : <TbdSlot isFuture={roundIndex > 0} />
+        }
+      </div>
+
+      {/* Connector lines (right side of the match column) */}
+      {!isLastRound && (
+        <>
+          {/* Top vertical arm */}
+          <div style={{
+            position: 'absolute',
+            left: COL_W - 1,
+            top:  entry1Top + CELL_H / 2,
+            width: 1,
+            height: topArmH,
+          }} className="bg-border" />
+
+          {/* Bottom vertical arm */}
+          <div style={{
+            position: 'absolute',
+            left: COL_W - 1,
+            top:  midY,
+            width: 1,
+            height: bottomArmH,
+          }} className="bg-border" />
+
+          {/* Horizontal line at midpoint */}
+          <div style={{
+            position: 'absolute',
+            left: COL_W - 1,
+            top:  midY,
+            width: CONN_W + 1,
+            height: 1,
+          }} className="bg-border" />
+        </>
+      )}
+
+      {/* Last round: just horizontal to champion slot */}
+      {isLastRound && (
+        <div style={{
+          position: 'absolute',
+          left: COL_W - 1,
+          top:  midY,
+          width: CONN_W + 1,
+          height: 1,
+        }} className="bg-border" />
       )}
     </div>
   )
@@ -151,27 +208,18 @@ function BracketPair({
 function DraggableSlot({
   slot, canEdit, isSwapping,
 }: {
-  slot:       BracketSlot
-  canEdit:    boolean
-  isSwapping: boolean
+  slot: BracketSlot; canEdit: boolean; isSwapping: boolean
 }) {
   const id = `pos-${slot.position}`
   const draggable = useDraggable({ id, disabled: !canEdit || !slot.entryId || slot.isBye })
   const droppable = useDroppable({ id, disabled: !canEdit || slot.isBye })
 
-  // Combine refs
   function setRef(el: HTMLElement | null) {
     draggable.setNodeRef(el)
     droppable.setNodeRef(el)
   }
 
-  if (slot.isBye) {
-    return (
-      <div className="px-2 py-1.5 w-36 bg-court-panel/50">
-        <span className="font-mono text-[10px] text-muted-foreground/50 uppercase tracking-widest">BYE</span>
-      </div>
-    )
-  }
+  if (slot.isBye) return <ByeSlot />
 
   const canDrag = canEdit && !!slot.entryId
 
@@ -181,46 +229,71 @@ function DraggableSlot({
       {...(canDrag ? draggable.attributes : {})}
       {...(canDrag ? draggable.listeners : {})}
       className={cn(
-        'px-2 py-1.5 w-36 bg-court-card flex items-center gap-1 touch-none select-none',
-        slot.seed     && 'bg-gold/5',
-        canDrag       && 'cursor-grab active:cursor-grabbing',
+        'flex items-center gap-1 px-2 bg-court-card border border-border touch-none select-none overflow-hidden',
+        slot.seed     && 'bg-gold/5 border-gold/20',
+        canDrag       && 'cursor-grab active:cursor-grabbing hover:border-gold/30',
         draggable.isDragging && 'opacity-40',
-        droppable.isOver     && 'ring-1 ring-inset ring-gold/60 bg-gold/10',
+        droppable.isOver     && 'ring-1 ring-inset ring-gold/60 bg-gold/10 border-gold/40',
         isSwapping           && 'opacity-60 animate-pulse',
       )}
+      style={{ height: CELL_H }}
     >
-      {canDrag && (
-        <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground/30 group-hover:text-muted-foreground/60" />
-      )}
-      <div className="min-w-0 flex-1">
+      {canDrag && <GripVertical className="h-3 w-3 shrink-0 text-muted-foreground/25" />}
+      <div className="min-w-0 flex-1 flex items-center gap-1">
         {slot.seed && (
-          <span className="font-mono text-[10px] text-gold mr-1">[{slot.seed}]</span>
-        )}
-        {slot.isQualifier && (
-          <span className="font-mono text-[10px] text-blue-400 mr-1">{slot.label.split(' ')[0]}</span>
+          <span className="font-mono text-[10px] text-gold shrink-0 flex items-center gap-0.5">
+            <Crown className="h-2.5 w-2.5" />
+            {slot.seed}
+          </span>
         )}
         <span className={cn(
-          'font-body text-[11px] truncate block leading-tight',
-          slot.entryId ? 'text-foreground' : 'text-muted-foreground',
+          'font-body text-[11px] leading-tight truncate',
+          slot.entryId ? 'text-foreground' : 'text-muted-foreground/50',
         )}>
-          {slot.isQualifier ? slot.label.slice(slot.label.indexOf(' ') + 1) : slot.label}
+          {slot.label}
         </span>
       </div>
     </div>
   )
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── ByeSlot ─────────────────────────────────────────────────────────────────
 
-function PlaceholderSlot({ label }: { label: string }) {
+function ByeSlot() {
   return (
-    <div className="px-2 py-1.5 w-28 rounded border border-dashed border-border">
-      <span className="font-body text-[10px] text-muted-foreground/50">{label}</span>
+    <div
+      className="flex items-center px-3 bg-court/50 border border-dashed border-border/40"
+      style={{ height: CELL_H }}
+    >
+      <span className="font-mono text-[10px] text-muted-foreground/30 uppercase tracking-widest">BYE</span>
     </div>
   )
 }
 
-/** Extract slot position number from a DnD id like "pos-7" */
-export function posFromDndId(id: string): number {
-  return parseInt(id.replace('pos-', ''), 10)
+// ─── TbdSlot ──────────────────────────────────────────────────────────────────
+
+function TbdSlot({ isFuture }: { isFuture: boolean }) {
+  if (!isFuture) return <ByeSlot />
+  return (
+    <div
+      className="flex items-center px-3 bg-court-panel/30 border border-dashed border-border/30"
+      style={{ height: CELL_H }}
+    >
+      <span className="font-body text-[10px] text-muted-foreground/25">— TBD —</span>
+    </div>
+  )
+}
+
+// ─── ChampionSlot ─────────────────────────────────────────────────────────────
+
+function ChampionSlot() {
+  return (
+    <div
+      className="flex flex-col items-center justify-center rounded-lg border border-gold/40 bg-gold/5 px-3"
+      style={{ height: CELL_H * 2 }}
+    >
+      <Crown className="h-4 w-4 text-gold mb-1" />
+      <span className="font-display text-[10px] tracking-widest uppercase text-gold">Champion</span>
+    </div>
+  )
 }
