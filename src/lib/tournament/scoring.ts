@@ -211,7 +211,7 @@ export function addSuperTbPoint(score: MatchScore, player: MatchPlayer): MatchSc
   if (!score.superTb) return score
   const tb  = { ...score.superTb }
   tb[player]++
-  const opp  = player === 'e1' ? tb.e2 : tb.e1
+  const _opp = player === 'e1' ? tb.e2 : tb.e1
   // Golden point condition : 10-10 → next point wins
   const gp   = tb.e1 === 10 && tb.e2 === 10
   return { ...score, superTb: tb, goldenPoint: gp }

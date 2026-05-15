@@ -1,7 +1,7 @@
 import { notFound }        from 'next/navigation'
 import { headers }         from 'next/headers'
 import Link                from 'next/link'
-import { Radio, Copy, ExternalLink, Monitor } from 'lucide-react'
+import { Radio, Monitor } from 'lucide-react'
 import { createClient }    from '@/lib/supabase/server'
 import { SectionTitle, CategoryBadge, StatusBadge } from '@/components/mpl'
 import { BroadcastClient } from './_components/BroadcastClient'

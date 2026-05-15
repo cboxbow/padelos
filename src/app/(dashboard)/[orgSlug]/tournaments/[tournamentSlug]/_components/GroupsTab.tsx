@@ -47,9 +47,9 @@ export function GroupsTab({
   const [entries, setEntries]           = useState<EntryRow[]>(
     initialEntries.map(e => ({ ...e, is_direct_entry: e.is_direct_entry ?? (e.seed !== null) }))
   )
-  const [groups,       setGroups]       = useState<GroupRow[]>(initialGroups)
+  const [groups]       = useState<GroupRow[]>(initialGroups)
   const [groupEntries, setGroupEntries] = useState<GEntryRow[]>(initialGroupEntries)
-  const [groupMatches, setGroupMatches] = useState<GroupMatch[]>(initialGroupMatches)
+  const [groupMatches] = useState<GroupMatch[]>(initialGroupMatches)
   const [saving, startSave]             = useTransition()
   const [generating, startGenerate]     = useTransition()
   const [moving, setMoving]             = useState<string | null>(null)

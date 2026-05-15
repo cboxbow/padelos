@@ -2,7 +2,6 @@ import type { Metadata }   from 'next'
 import { notFound }         from 'next/navigation'
 import { Calendar, MapPin, Users, Trophy, Clock } from 'lucide-react'
 import { createClient }     from '@/lib/supabase/server'
-import { CategoryBadge }    from '@/components/mpl'
 import { MATCH_FORMAT_LABELS, TOURNAMENT_STATUS_LABELS } from '@/components/mpl/design-tokens'
 import type { TableRow, MatchFormat, TournamentStatus } from '@/types'
 
@@ -44,7 +43,7 @@ export default async function PublicOverviewPage({
 }: {
   params: Promise<{ orgSlug: string; tournamentSlug: string }>
 }) {
-  const { orgSlug, tournamentSlug } = await params
+  const { tournamentSlug } = await params
   const supabase = await createClient()
 
   // ── Tournament ──────────────────────────────────────────────────────────────
@@ -228,7 +227,6 @@ export default async function PublicOverviewPage({
             {completed.map(m => {
               const t1 = entryLabel(m.entry1_id)
               const t2 = entryLabel(m.entry2_id)
-              const winnerLabel = m.winner_id ? entryLabel(m.winner_id) : null
               const score = m.score
                 ? (() => {
                     const s = m.score as { sets?: Array<{e1:number;e2:number}> } | null

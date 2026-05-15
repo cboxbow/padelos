@@ -34,7 +34,7 @@ export function DrawTab({ tournamentSlug, tournament, initialMatches, entries, g
   const router  = useRouter()
   const canEdit = ['draft', 'registration', 'active'].includes(tournament.status)
 
-  const [matches, setMatches]   = useState<MatchRow[]>(initialMatches)
+  const [matches]   = useState<MatchRow[]>(initialMatches)
   const [localSlots, setLocalSlots] = useState<BracketSlot[] | null>(null)
   const [generating, startGen]  = useTransition()
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null)

@@ -129,7 +129,7 @@ export async function POST(
     .eq('tournament_id', t.id).order('group_index')
   const groups = (gData ?? []) as GroupRow[]
 
-  let qualifiedEntries: EntryRow[] = []
+  const qualifiedEntries: EntryRow[] = []
 
   if (groups.length > 0) {
     const { data: geData } = await supabase
