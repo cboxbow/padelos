@@ -37,7 +37,7 @@ interface Props {
 // ─── SortableEntry ────────────────────────────────────────────────────────────
 
 export function SortableEntry({
-  ge, label, groups: _groups, tournamentSlug: _tournamentSlug, onMove, disabled,
+  ge, label, groups, tournamentSlug: _tournamentSlug, onMove, disabled,
 }: {
   ge:             GEntryRow
   label:          string
