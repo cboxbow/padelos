@@ -52,7 +52,6 @@ export function GroupsTab({
   const [groupMatches] = useState<GroupMatch[]>(initialGroupMatches)
   const [saving, startSave]             = useTransition()
   const [generating, startGenerate]     = useTransition()
-  const [moving, setMoving]             = useState<string | null>(null)
 
   const hasGroups   = groups.length > 0
   const canEdit     = ['draft','registration','active'].includes(tournament.status)
@@ -98,20 +97,6 @@ export function GroupsTab({
       toast.success(`${json.nbGroups} groupes générés`)
       router.refresh()
     })
-  }
-
-  // ── Déplacer une paire post-génération ───────────────────────────────────────
-  async function moveEntry(entryId: string, toGroupId: string | undefined) {
-    setMoving(entryId)
-    try {
-      const res = await fetch(`/api/tournaments/${tournamentSlug}/groups/reassign`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entryId, toGroupId }),
-      })
-      if (!res.ok) { toast.error('Erreur déplacement'); return }
-      toast.success('Paire déplacée')
-      router.refresh()
-    } finally { setMoving(null) }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -330,64 +315,3 @@ export function GroupsTab({
   )
 }
 
-// ─── GroupCard ────────────────────────────────────────────────────────────────
-
-function GroupCard({
-  label, members, matches, entryLabel, groups, moving, onMove,
-}: {
-  label:      string
-  members:    GEntryRow[]
-  matches:    GroupMatch[]
-  entryLabel: (id: string) => string
-  groups:     GroupRow[]
-  moving:     string | null
-  onMove:     (entryId: string, toGroupId: string | undefined) => void
-}) {
-  return (
-    <div className={`rounded-xl border p-4 space-y-3 ${LABEL_COLORS[label] ?? 'border-border bg-court-card'}`}>
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-2xl tracking-widest text-foreground">Groupe {label}</h3>
-        <span className="font-mono text-xs text-muted-foreground">{members.length} paires</span>
-      </div>
-
-      <ul className="space-y-1">
-        {members.sort((a, b) => (a.position ?? 99) - (b.position ?? 99)).map(ge => (
-          <li key={ge.id} className="flex items-center gap-2 text-xs font-body">
-            <span className="text-foreground truncate flex-1">{entryLabel(ge.entry_id)}</span>
-            <select
-              className="text-[10px] font-mono bg-court border border-border rounded px-1 py-0.5 text-muted-foreground shrink-0"
-              defaultValue=""
-              disabled={moving === ge.entry_id}
-              onChange={ev => {
-                const val = ev.target.value
-                onMove(ge.entry_id, val === 'direct' ? undefined : val)
-                ev.target.value = ''
-              }}
-            >
-              <option value="">Déplacer…</option>
-              {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-              <option value="direct">→ Draw Direct</option>
-            </select>
-          </li>
-        ))}
-      </ul>
-
-      {matches.length > 0 && (
-        <div>
-          <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-widest mb-1.5">
-            {matches.length} match{matches.length > 1 ? 's' : ''}
-          </p>
-          <ul className="space-y-1">
-            {matches.map(m => (
-              <li key={m.id} className="flex items-center gap-1.5 text-[11px] font-body text-muted-foreground">
-                <span className="font-mono text-gold w-6">{m.notes}</span>
-                <ChevronRight className="h-3 w-3 opacity-40" />
-                <span className="truncate">{entryLabel(m.entry1_id ?? '')} <span className="opacity-40">vs</span> {entryLabel(m.entry2_id ?? '')}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}

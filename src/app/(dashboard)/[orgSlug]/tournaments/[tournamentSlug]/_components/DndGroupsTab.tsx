@@ -37,7 +37,7 @@ interface Props {
 // ─── SortableEntry ────────────────────────────────────────────────────────────
 
 export function SortableEntry({
-  ge, label, groups, tournamentSlug, onMove, disabled,
+  ge, label, groups: _groups, tournamentSlug: _tournamentSlug, onMove, disabled,
 }: {
   ge:             GEntryRow
   label:          string
@@ -85,7 +85,7 @@ export function SortableEntry({
 // ─── DroppableGroup ───────────────────────────────────────────────────────────
 
 export function DroppableGroup({
-  group, members, entryLabel, groups, tournamentSlug, onMove, canEdit, children,
+  group, members, entryLabel, groups, tournamentSlug, onMove, canEdit, children: _children,
 }: {
   group:          GroupRow
   members:        GEntryRow[]
@@ -125,7 +125,7 @@ export function DroppableGroup({
 // ─── DndGroupsProvider ───────────────────────────────────────────────────────
 
 export function DndGroupsProvider({
-  tournamentSlug, groups, groupEntries, entries, canEdit, onGroupEntriesChange, children,
+  tournamentSlug, groups: _groups, groupEntries, entries, canEdit: _canEdit, onGroupEntriesChange, children,
 }: Props & { children: (props: {
   groupEntries: GEntryRow[]
   onMove: (entryId: string, toGroupId: string | undefined) => Promise<void>

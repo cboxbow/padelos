@@ -263,7 +263,7 @@ export function DrawTab({ tournamentSlug, tournament, initialMatches, entries, g
             {canDragDrop && (
               <p className="text-xs font-body text-muted-foreground flex items-center gap-1.5">
                 <GripVertical className="h-3 w-3" />
-                Glissez n'importe quel slot (équipe ou BYE) pour échanger sa position.
+                Glissez n&apos;importe quel slot (équipe ou BYE) pour échanger sa position.
               </p>
             )}
 

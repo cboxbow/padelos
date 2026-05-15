@@ -176,7 +176,7 @@ function EmptyTournaments({ orgSlug }: { orgSlug: string }) {
     <div className="rounded-xl border border-dashed border-border bg-court-card p-10 text-center space-y-4">
       <Trophy className="mx-auto h-10 w-10 text-muted-foreground/40" />
       <div>
-        <p className="font-body font-medium text-foreground">Aucun tournoi pour l'instant</p>
+        <p className="font-body font-medium text-foreground">Aucun tournoi pour l&apos;instant</p>
         <p className="font-body text-sm text-muted-foreground mt-1">Créez votre premier tournoi pour commencer.</p>
       </div>
       <Button asChild className="bg-gold text-black hover:bg-gold-light font-semibold tracking-wider uppercase">

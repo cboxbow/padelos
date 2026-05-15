@@ -33,7 +33,7 @@ interface PlayersClientProps {
 
 export function PlayersClient({ orgSlug, initialPlayers }: PlayersClientProps) {
   const router = useRouter()
-  const [players, setPlayers]   = useState<PlayerRow[]>(initialPlayers)
+  const [players]               = useState<PlayerRow[]>(initialPlayers)
   const [query,   setQuery]     = useState('')
   const [sheetOpen, setSheet]   = useState(false)
   const [adding, startAdd]      = useTransition()
